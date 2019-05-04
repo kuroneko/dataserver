@@ -1,0 +1,7 @@
+fsd:
+  server:
+    ip: ip
+    port: port
+data:
+  server:
+    name: name
