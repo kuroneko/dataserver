@@ -36,6 +36,9 @@ func listen(bufReader *bufio.Reader, clientList dataserver.ClientList, conn net.
 		if split[0] == "PD" {
 			dataserver.UpdatePosition(split, &clientList)
 		}
+		if split[0] == "AD" {
+			dataserver.UpdateControllerData(split, &clientList)
+		}
 		if split[0] == "PING" {
 			fsd.Pong(conn, split)
 		}
