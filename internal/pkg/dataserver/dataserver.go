@@ -115,6 +115,12 @@ func RemoveClient(split []string, clientList *ClientList) error {
 			break
 		}
 	}
+	for i, v := range clientList.ATCData {
+		if v.Callsign == split[5] {
+			*&clientList.ATCData = append(clientList.ATCData[:i], clientList.ATCData[i+1:]...)
+			break
+		}
+	}
 	clientJSON, err := encodeJSON(*clientList)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
