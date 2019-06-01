@@ -4,16 +4,18 @@ import (
 	"bufio"
 	"dataserver/internal/pkg/dataserver"
 	"dataserver/internal/pkg/fsd"
+	"github.com/bugsnag/bugsnag-go"
 	"net"
 )
 
 // Start connects and begins parsing and saving data files.
 func Start() {
 	dataserver.ReadConfig()
+	dataserver.ConfigureBugsnag()
 	conn := fsd.Connect()
 	defer func() {
 		if err := conn.Close(); err != nil {
-			panic(err)
+			_ = bugsnag.Notify(err)
 		}
 	}()
 	bufReader := fsd.SetupReader(conn)
@@ -25,19 +27,39 @@ func Start() {
 // listen continually reads, parses and handles FSD packets.
 func listen(bufReader *bufio.Reader, clientList dataserver.ClientList, conn net.Conn) {
 	for {
-		bytes := fsd.ReadMessage(bufReader)
+		bytes, err := fsd.ReadMessage(bufReader)
+		if err!= nil {
+			_ = bugsnag.Notify(err)
+			continue
+		}
 		split := fsd.ParseMessage(bytes)
 		if split[0] == "ADDCLIENT" {
-			dataserver.AddClient(split, &clientList)
+			err = dataserver.AddClient(split, &clientList)
+			if err!= nil {
+				_ = bugsnag.Notify(err)
+				continue
+			}
 		}
 		if split[0] == "RMCLIENT" {
-			dataserver.RemoveClient(split, &clientList)
+			err = dataserver.RemoveClient(split, &clientList)
+			if err!= nil {
+				_ = bugsnag.Notify(err)
+				continue
+			}
 		}
 		if split[0] == "PD" {
-			dataserver.UpdatePosition(split, &clientList)
+			err = dataserver.UpdatePosition(split, &clientList)
+			if err!= nil {
+				_ = bugsnag.Notify(err)
+				continue
+			}
 		}
 		if split[0] == "AD" {
-			dataserver.UpdateControllerData(split, &clientList)
+			err = dataserver.UpdateControllerData(split, &clientList)
+			if err!= nil {
+				_ = bugsnag.Notify(err)
+				continue
+			}
 		}
 		if split[0] == "PING" {
 			fsd.Pong(conn, split)

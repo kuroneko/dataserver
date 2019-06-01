@@ -3,7 +3,9 @@ package dataserver
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/bugsnag/bugsnag-go"
 	"github.com/olebedev/config"
+	"github.com/pkg/errors"
 	"io/ioutil"
 )
 
@@ -54,7 +56,7 @@ type PositionData struct {
 var Cfg *config.Config
 
 // UpdatePosition updates a client's position data in the Client list and updates the JSON file.
-func UpdatePosition(split []string, clientList *ClientList) {
+func UpdatePosition(split []string, clientList *ClientList) error {
 	fmt.Printf("Position Update Received: %v\n", split[6])
 	for i, v := range clientList.PilotData {
 		if v.Callsign == split[6] {
@@ -68,11 +70,18 @@ func UpdatePosition(split []string, clientList *ClientList) {
 		}
 	}
 	clientJSON, err := encodeJSON(*clientList)
-	writeDataFile(err, clientJSON)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
+	}
+	err = writeDataFile(err, clientJSON)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
+	}
+	return nil
 }
 
 // UpdateControllerData updates a controllers's data in the Client list and updates the JSON file.
-func UpdateControllerData(split []string, clientList *ClientList) {
+func UpdateControllerData(split []string, clientList *ClientList) error {
 	fmt.Printf("Controller Update Received: %v\n", split[5])
 	for i, v := range clientList.ATCData {
 		if v.Callsign == split[5] {
@@ -87,11 +96,18 @@ func UpdateControllerData(split []string, clientList *ClientList) {
 		}
 	}
 	clientJSON, err := encodeJSON(*clientList)
-	writeDataFile(err, clientJSON)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
+	}
+	err = writeDataFile(err, clientJSON)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
+	}
+	return nil
 }
 
 // RemoveClient removes a client from the Client list and updates the JSON file.
-func RemoveClient(split []string, clientList *ClientList) {
+func RemoveClient(split []string, clientList *ClientList) error {
 	fmt.Printf("Client Deleted: %v\n", split[5])
 	for i, v := range clientList.PilotData {
 		if v.Callsign == split[5] {
@@ -100,11 +116,18 @@ func RemoveClient(split []string, clientList *ClientList) {
 		}
 	}
 	clientJSON, err := encodeJSON(*clientList)
-	writeDataFile(err, clientJSON)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
+	}
+	err = writeDataFile(err, clientJSON)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
+	}
+	return nil
 }
 
 // AddClient adds a client to the Client list and updates the JSON file.
-func AddClient(split []string, clientList *ClientList) {
+func AddClient(split []string, clientList *ClientList) error {
 	fmt.Printf("Client Added: %v\n", split[7])
 	if split[8] == "1" {
 		*&clientList.PilotData = append(clientList.PilotData, PilotData{
@@ -124,24 +147,36 @@ func AddClient(split []string, clientList *ClientList) {
 		})
 	}
 	clientJSON, err := encodeJSON(*clientList)
-	writeDataFile(err, clientJSON)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
+	}
+	err = writeDataFile(err, clientJSON)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
+	}
+	return nil
 }
 
 // writeDataFile overwrites the data file with new data.
-func writeDataFile(err error, clientJSON []byte) {
-	err = ioutil.WriteFile("vatsim-data.json", clientJSON, 0644)
+func writeDataFile(err error, clientJSON []byte) error {
+	directory, err := Cfg.String("data.file.directory")
 	if err != nil {
 		panic(err)
 	}
+	err = ioutil.WriteFile(directory+"vatsim-data.json", clientJSON, 0644)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
+	}
+	return nil
 }
 
 // encodeJSON encodes the current Client list to JSON.
 func encodeJSON(clientList ClientList) ([]byte, error) {
 	clientJSON, err := json.Marshal(clientList)
 	if err != nil {
-		panic(err)
+		return nil, errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
 	}
-	return clientJSON, err
+	return clientJSON, nil
 }
 
 // ReadConfig reads the config file and instantiates the config object
@@ -155,4 +190,15 @@ func ReadConfig() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// ConfigureBugsnag sets up bugsnag for panic reporting
+func ConfigureBugsnag() {
+	apiKey, err := Cfg.String("bugsnag.credentials.api_key")
+	if err != nil {
+		panic(err)
+	}
+	bugsnag.Configure(bugsnag.Configuration{
+		APIKey: apiKey,
+	})
 }

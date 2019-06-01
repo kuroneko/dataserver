@@ -5,3 +5,8 @@ fsd:
 data:
   server:
     name: name
+  file:
+    directory: directory
+bugsnag:
+  credentials:
+    api_key: key
