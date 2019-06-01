@@ -110,3 +110,5 @@ modules.xml
 
 # Ignore config
 config.yml
+cmd/.DS_Store
+.DS_Store

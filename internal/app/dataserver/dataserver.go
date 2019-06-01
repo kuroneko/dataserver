@@ -28,35 +28,35 @@ func Start() {
 func listen(bufReader *bufio.Reader, clientList dataserver.ClientList, conn net.Conn) {
 	for {
 		bytes, err := fsd.ReadMessage(bufReader)
-		if err!= nil {
+		if err != nil {
 			_ = bugsnag.Notify(err)
 			continue
 		}
 		split := fsd.ParseMessage(bytes)
 		if split[0] == "ADDCLIENT" {
 			err = dataserver.AddClient(split, &clientList)
-			if err!= nil {
+			if err != nil {
 				_ = bugsnag.Notify(err)
 				continue
 			}
 		}
 		if split[0] == "RMCLIENT" {
 			err = dataserver.RemoveClient(split, &clientList)
-			if err!= nil {
+			if err != nil {
 				_ = bugsnag.Notify(err)
 				continue
 			}
 		}
 		if split[0] == "PD" {
 			err = dataserver.UpdatePosition(split, &clientList)
-			if err!= nil {
+			if err != nil {
 				_ = bugsnag.Notify(err)
 				continue
 			}
 		}
 		if split[0] == "AD" {
 			err = dataserver.UpdateControllerData(split, &clientList)
-			if err!= nil {
+			if err != nil {
 				_ = bugsnag.Notify(err)
 				continue
 			}
