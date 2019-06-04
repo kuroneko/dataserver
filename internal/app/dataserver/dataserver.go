@@ -61,6 +61,13 @@ func listen(bufReader *bufio.Reader, clientList dataserver.ClientList, conn net.
 				continue
 			}
 		}
+		if split[0] == "PLAN" {
+			err = dataserver.UpdateFlightPlan(split, &clientList)
+			if err != nil {
+				_ = bugsnag.Notify(err)
+				continue
+			}
+		}
 		if split[0] == "PING" {
 			fsd.Pong(conn, split)
 		}
