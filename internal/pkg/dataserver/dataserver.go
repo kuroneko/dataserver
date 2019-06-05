@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"strconv"
+	"time"
 )
 
 // ClientList is a list of all clients currently connected to the network.
@@ -72,9 +73,12 @@ type FlightPlanTime struct {
 // Cfg contains all of the necessary configuration data.
 var Cfg *config.Config
 
+// Channel is a channel that streams the clientList updates
+var Channel = make(chan ClientList)
+
 // UpdatePosition updates a client's position data in the Client list and updates the JSON file.
 func UpdatePosition(split []string, clientList *ClientList) error {
-	fmt.Printf("Position Update Received: %v\n", split[6])
+	fmt.Printf("%+v Position Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[6])
 	latitude, err := convertStringToDouble(split[9])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get latitude %+v", split[9])
@@ -105,20 +109,13 @@ func UpdatePosition(split []string, clientList *ClientList) error {
 			break
 		}
 	}
-	clientJSON, err := encodeJSON(*clientList)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
-	}
-	err = writeDataFile(err, clientJSON)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
-	}
+	Channel <- *clientList
 	return nil
 }
 
 // UpdateFlightPlan updates the flight plan entry for the specified callsign
 func UpdateFlightPlan(split []string, clientList *ClientList) error {
-	fmt.Printf("Flight Plan Update Received: %v\n", split[5])
+	fmt.Printf("%+v Flight Plan Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[5])
 	cruiseSpeed, err := convertStringToInteger(split[9])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get cruise speed %+v", split[9])
@@ -164,14 +161,7 @@ func UpdateFlightPlan(split []string, clientList *ClientList) error {
 			break
 		}
 	}
-	clientJSON, err := encodeJSON(*clientList)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
-	}
-	err = writeDataFile(err, clientJSON)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
-	}
+	Channel <- *clientList
 	return nil
 }
 
@@ -211,7 +201,7 @@ func getHeading(split string) (int32, error) {
 
 // UpdateControllerData updates a controllers's data in the Client list and updates the JSON file.
 func UpdateControllerData(split []string, clientList *ClientList) error {
-	fmt.Printf("Controller Update Received: %v\n", split[5])
+	fmt.Printf("%+v Controller Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[5])
 	frequency, err := convertStringToDouble("1" + split[6][0:2] + "." + split[6][2:5])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get frequency %+v", split[6])
@@ -242,20 +232,13 @@ func UpdateControllerData(split []string, clientList *ClientList) error {
 			break
 		}
 	}
-	clientJSON, err := encodeJSON(*clientList)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
-	}
-	err = writeDataFile(err, clientJSON)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
-	}
+	Channel <- *clientList
 	return nil
 }
 
 // RemoveClient removes a client from the Client list and updates the JSON file.
 func RemoveClient(split []string, clientList *ClientList) error {
-	fmt.Printf("Client Deleted: %v\n", split[5])
+	fmt.Printf("%+v Client Deleted: %+v\n", time.Now().UTC().Format(time.RFC3339), split[5])
 	for i, v := range clientList.PilotData {
 		if v.Callsign == split[5] {
 			*&clientList.PilotData = append(clientList.PilotData[:i], clientList.PilotData[i+1:]...)
@@ -268,20 +251,13 @@ func RemoveClient(split []string, clientList *ClientList) error {
 			break
 		}
 	}
-	clientJSON, err := encodeJSON(*clientList)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
-	}
-	err = writeDataFile(err, clientJSON)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
-	}
+	Channel <- *clientList
 	return nil
 }
 
 // AddClient adds a client to the Client list and updates the JSON file.
 func AddClient(split []string, clientList *ClientList) error {
-	fmt.Printf("Client Added: %v\n", split[7])
+	fmt.Printf("%+v Client Added: %+v\n", time.Now().UTC().Format(time.RFC3339), split[7])
 	cid, err := convertStringToInteger(split[5])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get CID %+v", split[5])
@@ -310,19 +286,12 @@ func AddClient(split []string, clientList *ClientList) error {
 			},
 		})
 	}
-	clientJSON, err := encodeJSON(*clientList)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
-	}
-	err = writeDataFile(err, clientJSON)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
-	}
+	Channel <- *clientList
 	return nil
 }
 
-// writeDataFile overwrites the data file with new data.
-func writeDataFile(err error, clientJSON []byte) error {
+// WriteDataFile overwrites the data file with new data.
+func WriteDataFile(clientJSON []byte) error {
 	directory, err := Cfg.String("data.file.directory")
 	if err != nil {
 		panic(err)
@@ -334,8 +303,8 @@ func writeDataFile(err error, clientJSON []byte) error {
 	return nil
 }
 
-// encodeJSON encodes the current Client list to JSON.
-func encodeJSON(clientList ClientList) ([]byte, error) {
+// EncodeJSON encodes the current Client list to JSON.
+func EncodeJSON(clientList ClientList) ([]byte, error) {
 	clientJSON, err := json.Marshal(clientList)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
