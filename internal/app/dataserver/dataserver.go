@@ -23,7 +23,7 @@ func Start() {
 	}()
 	bufReader := fsd.SetupReader(conn)
 	fsd.Sync(conn)
-	clientList := dataserver.ClientList{}
+	clientList := &dataserver.ClientList{}
 	go update()
 	listen(bufReader, clientList, conn)
 }
@@ -43,7 +43,7 @@ func update() {
 }
 
 // listen continually reads, parses and handles FSD packets.
-func listen(bufReader *bufio.Reader, clientList dataserver.ClientList, conn net.Conn) {
+func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net.Conn) {
 	for {
 		bytes, err := fsd.ReadMessage(bufReader)
 		if err != nil {
@@ -52,35 +52,35 @@ func listen(bufReader *bufio.Reader, clientList dataserver.ClientList, conn net.
 		}
 		split := fsd.ParseMessage(bytes)
 		if split[0] == "ADDCLIENT" {
-			err = dataserver.AddClient(split, &clientList)
+			err = dataserver.AddClient(split, clientList)
 			if err != nil {
 				_ = bugsnag.Notify(err)
 				continue
 			}
 		}
 		if split[0] == "RMCLIENT" {
-			err = dataserver.RemoveClient(split, &clientList)
+			err = dataserver.RemoveClient(split, clientList)
 			if err != nil {
 				_ = bugsnag.Notify(err)
 				continue
 			}
 		}
 		if split[0] == "PD" {
-			err = dataserver.UpdatePosition(split, &clientList)
+			err = dataserver.UpdatePosition(split, clientList)
 			if err != nil {
 				_ = bugsnag.Notify(err)
 				continue
 			}
 		}
 		if split[0] == "AD" {
-			err = dataserver.UpdateControllerData(split, &clientList)
+			err = dataserver.UpdateControllerData(split, clientList)
 			if err != nil {
 				_ = bugsnag.Notify(err)
 				continue
 			}
 		}
 		if split[0] == "PLAN" {
-			err = dataserver.UpdateFlightPlan(split, &clientList)
+			err = dataserver.UpdateFlightPlan(split, clientList)
 			if err != nil {
 				_ = bugsnag.Notify(err)
 				continue

@@ -22,17 +22,17 @@ type PilotData struct {
 	Server     string     `json:"server"`
 	Callsign   string     `json:"callsign"`
 	Member     MemberData `json:"member"`
-	Latitude   float64    `json:"latitude"`
-	Longitude  float64    `json:"longitude"`
-	Altitude   int32      `json:"altitude"`
-	Speed      int32      `json:"speed"`
-	Heading    int32      `json:"heading"`
+	Latitude   float32    `json:"latitude"`
+	Longitude  float32    `json:"longitude"`
+	Altitude   int        `json:"altitude"`
+	Speed      int        `json:"speed"`
+	Heading    int        `json:"heading"`
 	FlightPlan FlightPlan `json:"plan"`
 }
 
 // MemberData represents a user's personal data.
 type MemberData struct {
-	CID  int32  `json:"cid"`
+	CID  int    `json:"cid"`
 	Name string `json:"name"`
 }
 
@@ -41,19 +41,19 @@ type ATCData struct {
 	Server       string     `json:"server"`
 	Callsign     string     `json:"callsign"`
 	Member       MemberData `json:"member"`
-	Rating       int32      `json:"rating"`
+	Rating       int        `json:"rating"`
 	Frequency    string     `json:"frequency"`
-	FacilityType int32      `json:"facility"`
-	VisualRange  int32      `json:"range"`
-	Latitude     float64    `json:"latitude"`
-	Longitude    float64    `json:"longitude"`
+	FacilityType int        `json:"facility"`
+	VisualRange  int        `json:"range"`
+	Latitude     float32    `json:"latitude"`
+	Longitude    float32    `json:"longitude"`
 }
 
 // FlightPlan describes the data about a filed flight plan.
 type FlightPlan struct {
 	FlightRules string         `json:"flight_rules"`
 	Aircraft    string         `json:"aircraft"`
-	CruiseSpeed int32          `json:"cruise_speed"`
+	CruiseSpeed int            `json:"cruise_speed"`
 	Departure   string         `json:"departure"`
 	Arrival     string         `json:"arrival"`
 	Altitude    string         `json:"altitude"`
@@ -70,11 +70,13 @@ type FlightPlanTime struct {
 	Fuel      string `json:"fuel"`
 }
 
-// Cfg contains all of the necessary configuration data.
-var Cfg *config.Config
+var (
+	// Cfg contains all of the necessary configuration data.
+	Cfg *config.Config
 
-// Channel is a channel that streams the clientList updates
-var Channel = make(chan ClientList)
+	// Channel streams the clientList updates
+	Channel = make(chan ClientList)
+)
 
 // UpdatePosition updates a client's position data in the Client list and updates the JSON file.
 func UpdatePosition(split []string, clientList *ClientList) error {
@@ -87,11 +89,11 @@ func UpdatePosition(split []string, clientList *ClientList) error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get longitude %+v", split[10])
 	}
-	altitude, err := convertStringToInteger(split[11])
+	altitude, err := strconv.Atoi(split[11])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get altitude %+v", split[11])
 	}
-	speed, err := convertStringToInteger(split[12])
+	speed, err := strconv.Atoi(split[12])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get speed %+v", split[12])
 	}
@@ -116,27 +118,27 @@ func UpdatePosition(split []string, clientList *ClientList) error {
 // UpdateFlightPlan updates the flight plan entry for the specified callsign
 func UpdateFlightPlan(split []string, clientList *ClientList) error {
 	fmt.Printf("%+v Flight Plan Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[5])
-	cruiseSpeed, err := convertStringToInteger(split[9])
+	cruiseSpeed, err := strconv.Atoi(split[9])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get cruise speed %+v", split[9])
 	}
-	departureTime, err := convertStringToInteger(split[11])
+	departureTime, err := strconv.Atoi(split[11])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get departure time %+v", split[11])
 	}
-	enrouteTimeHours, err := convertStringToInteger(split[15])
+	enrouteTimeHours, err := strconv.Atoi(split[15])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get enroute time hours %+v", split[15])
 	}
-	enrouteTimeMinutes, err := convertStringToInteger(split[16])
+	enrouteTimeMinutes, err := strconv.Atoi(split[16])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get enroute time minutes %+v", split[16])
 	}
-	fuelTimeHours, err := convertStringToInteger(split[17])
+	fuelTimeHours, err := strconv.Atoi(split[17])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get fuel time hours %+v", split[17])
 	}
-	fuelTimeMinutes, err := convertStringToInteger(split[18])
+	fuelTimeMinutes, err := strconv.Atoi(split[18])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get fuel time minutes %+v", split[18])
 	}
@@ -166,25 +168,16 @@ func UpdateFlightPlan(split []string, clientList *ClientList) error {
 }
 
 // convertStringToDouble converts a string to a float64
-func convertStringToDouble(string string) (float64, error) {
-	double, err := strconv.ParseFloat(string, 64)
+func convertStringToDouble(string string) (float32, error) {
+	double, err := strconv.ParseFloat(string, 32)
 	if err != nil {
-		return 0, errors.Wrapf(err, "Failed to convert string to float64 %+v", string)
+		return 0, errors.Wrapf(err, "Failed to convert string to float32 %+v", string)
 	}
-	return double, nil
-}
-
-// convertStringToInteger converts a string to an int32
-func convertStringToInteger(string string) (int32, error) {
-	integer, err := strconv.ParseInt(string, 10, 32)
-	if err != nil {
-		return 0, errors.Wrapf(err, "Failed to convert string to int32 %+v", string)
-	}
-	return int32(integer), nil
+	return float32(double), nil
 }
 
 // getHeading parses the PBH FSD value to extract the heading
-func getHeading(split string) (int32, error) {
+func getHeading(split string) (int, error) {
 	pbh, err := strconv.ParseUint(split, 10, 32)
 	if err != nil {
 		return 0, errors.Wrapf(err, "Failed to parse PBH field %+v", split)
@@ -196,7 +189,7 @@ func getHeading(split string) (int32, error) {
 	} else if heading >= 360.0 {
 		heading -= 360
 	}
-	return int32(heading), nil
+	return int(heading), nil
 }
 
 // UpdateControllerData updates a controllers's data in the Client list and updates the JSON file.
@@ -206,11 +199,11 @@ func UpdateControllerData(split []string, clientList *ClientList) error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get frequency %+v", split[6])
 	}
-	facilityType, err := convertStringToInteger(split[7])
+	facilityType, err := strconv.Atoi(split[7])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get facility type %+v", split[7])
 	}
-	visualRange, err := convertStringToInteger(split[8])
+	visualRange, err := strconv.Atoi(split[8])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get visual range %+v", split[8])
 	}
@@ -258,11 +251,11 @@ func RemoveClient(split []string, clientList *ClientList) error {
 // AddClient adds a client to the Client list and updates the JSON file.
 func AddClient(split []string, clientList *ClientList) error {
 	fmt.Printf("%+v Client Added: %+v\n", time.Now().UTC().Format(time.RFC3339), split[7])
-	cid, err := convertStringToInteger(split[5])
+	cid, err := strconv.Atoi(split[5])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get CID %+v", split[5])
 	}
-	rating, err := convertStringToInteger(split[9])
+	rating, err := strconv.Atoi(split[9])
 	if err != nil {
 		return errors.Wrapf(err, "Failed to get rating %+v", split[9])
 	}
