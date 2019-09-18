@@ -28,11 +28,11 @@ func Start() {
 	listen(bufReader, clientList, conn)
 }
 
-// update handles the creation of a one minute ticker for updating the data file
+// update handles the creation of a 15 second ticker for updating the data file
 func update() {
 	now := time.Now().UTC()
 	for clientList := range dataserver.Channel {
-		if time.Since(now) >= time.Minute {
+		if time.Since(now) >= (15 * time.Second) {
 			err := updateFile(clientList)
 			if err != nil {
 				_ = bugsnag.Notify(err)
