@@ -5,7 +5,7 @@ import (
 	"dataserver/internal/pkg/dataserver"
 	"dataserver/internal/pkg/fsd"
 	"fmt"
-	"github.com/bugsnag/bugsnag-go"
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"net"
 	"time"
@@ -14,11 +14,11 @@ import (
 // Start connects and begins parsing and saving data files.
 func Start() {
 	dataserver.ReadConfig()
-	dataserver.ConfigureBugsnag()
+	dataserver.ConfigureSentry()
 	conn := fsd.Connect()
 	defer func() {
 		if err := conn.Close(); err != nil {
-			_ = bugsnag.Notify(err)
+			sentry.CaptureException(err)
 		}
 	}()
 	bufReader := fsd.SetupReader(conn)
@@ -35,7 +35,7 @@ func update() {
 		if time.Since(now) >= (15 * time.Second) {
 			err := updateFile(clientList)
 			if err != nil {
-				_ = bugsnag.Notify(err)
+				sentry.CaptureException(err)
 			}
 			now = time.Now().UTC()
 		}
@@ -47,46 +47,46 @@ func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net
 	for {
 		bytes, err := fsd.ReadMessage(bufReader)
 		if err != nil {
-			_ = bugsnag.Notify(err)
+			sentry.CaptureException(err)
 			continue
 		}
 		split := fsd.ParseMessage(bytes)
-		if split[0] == "ADDCLIENT" {
+		if split[0] == "ADDCLIENT" && len(split) >= 12 {
 			err = dataserver.AddClient(split, clientList)
 			if err != nil {
-				_ = bugsnag.Notify(err)
+				sentry.CaptureException(err)
 				continue
 			}
 		}
-		if split[0] == "RMCLIENT" {
+		if split[0] == "RMCLIENT" && len(split) >= 6 {
 			err = dataserver.RemoveClient(split, clientList)
 			if err != nil {
-				_ = bugsnag.Notify(err)
+				sentry.CaptureException(err)
 				continue
 			}
 		}
-		if split[0] == "PD" {
+		if split[0] == "PD" && len(split) >= 13 {
 			err = dataserver.UpdatePosition(split, clientList)
 			if err != nil {
-				_ = bugsnag.Notify(err)
+				sentry.CaptureException(err)
 				continue
 			}
 		}
-		if split[0] == "AD" {
+		if split[0] == "AD" && len(split) >= 12 {
 			err = dataserver.UpdateControllerData(split, clientList)
 			if err != nil {
-				_ = bugsnag.Notify(err)
+				sentry.CaptureException(err)
 				continue
 			}
 		}
-		if split[0] == "PLAN" {
+		if split[0] == "PLAN" && len(split) >= 22 {
 			err = dataserver.UpdateFlightPlan(split, clientList)
 			if err != nil {
-				_ = bugsnag.Notify(err)
+				sentry.CaptureException(err)
 				continue
 			}
 		}
-		if split[0] == "PING" {
+		if split[0] == "PING" && len(split) >= 6 {
 			fsd.Pong(conn, split)
 		}
 	}

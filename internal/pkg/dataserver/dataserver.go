@@ -3,7 +3,7 @@ package dataserver
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/bugsnag/bugsnag-go"
+	"github.com/getsentry/sentry-go"
 	"github.com/olebedev/config"
 	"github.com/pkg/errors"
 	"io/ioutil"
@@ -195,9 +195,15 @@ func getHeading(split string) (int, error) {
 // UpdateControllerData updates a controllers's data in the Client list and updates the JSON file.
 func UpdateControllerData(split []string, clientList *ClientList) error {
 	fmt.Printf("%+v Controller Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[5])
-	frequency, err := convertStringToDouble("1" + split[6][0:2] + "." + split[6][2:5])
-	if err != nil {
-		return errors.Wrapf(err, "Failed to get frequency %+v", split[6])
+	var frequency float32
+	var err error
+	if len(split[6]) >= 6 {
+		frequency, err = convertStringToDouble("1" + split[6][0:2] + "." + split[6][2:5])
+		if err != nil {
+			return errors.Wrapf(err, "Failed to get frequency %+v", split[6])
+		}
+	} else {
+		return errors.New("Invalid frequency: " + split[6])
 	}
 	facilityType, err := strconv.Atoi(split[7])
 	if err != nil {
@@ -318,13 +324,16 @@ func ReadConfig() {
 	}
 }
 
-// ConfigureBugsnag sets up bugsnag for panic reporting
-func ConfigureBugsnag() {
-	apiKey, err := Cfg.String("bugsnag.credentials.api_key")
+// ConfigureSentry sets up bugsnag for panic reporting
+func ConfigureSentry() {
+	dsn, err := Cfg.String("sentry.credentials.dsn")
 	if err != nil {
 		panic(err)
 	}
-	bugsnag.Configure(bugsnag.Configuration{
-		APIKey: apiKey,
+	err = sentry.Init(sentry.ClientOptions{
+		Dsn: dsn,
 	})
+	if err != nil {
+		panic(err)
+	}
 }

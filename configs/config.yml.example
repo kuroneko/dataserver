@@ -7,6 +7,6 @@ data:
     name: name
   file:
     directory: directory
-bugsnag:
+sentry:
   credentials:
-    api_key: key
+    dsn: dsn
