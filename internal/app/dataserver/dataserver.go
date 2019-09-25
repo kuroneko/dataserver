@@ -6,6 +6,7 @@ import (
 	"dataserver/internal/pkg/fsd"
 	"fmt"
 	"github.com/getsentry/sentry-go"
+	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"github.com/pkg/errors"
 	"net"
 	"time"
@@ -44,6 +45,14 @@ func update() {
 
 // listen continually reads, parses and handles FSD packets.
 func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net.Conn) {
+	fmt.Printf("%+v Starting Kafka connection\n", time.Now().UTC().Format(time.RFC3339))
+	producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "localhost"})
+	if err != nil {
+		fmt.Printf("%+v Kafka connection failed\n", time.Now().UTC().Format(time.RFC3339))
+		panic(err)
+	}
+	fmt.Printf("%+v Kafka connected\n", time.Now().UTC().Format(time.RFC3339))
+	defer producer.Close()
 	for {
 		bytes, err := fsd.ReadMessage(bufReader)
 		if err != nil {
@@ -52,35 +61,35 @@ func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net
 		}
 		split := fsd.ParseMessage(bytes)
 		if split[0] == "ADDCLIENT" && len(split) >= 12 {
-			err = dataserver.AddClient(split, clientList)
+			err = dataserver.AddClient(split, clientList, producer)
 			if err != nil {
 				sentry.CaptureException(err)
 				continue
 			}
 		}
 		if split[0] == "RMCLIENT" && len(split) >= 6 {
-			err = dataserver.RemoveClient(split, clientList)
+			err = dataserver.RemoveClient(split, clientList, producer)
 			if err != nil {
 				sentry.CaptureException(err)
 				continue
 			}
 		}
 		if split[0] == "PD" && len(split) >= 13 {
-			err = dataserver.UpdatePosition(split, clientList)
+			err = dataserver.UpdatePosition(split, clientList, producer)
 			if err != nil {
 				sentry.CaptureException(err)
 				continue
 			}
 		}
 		if split[0] == "AD" && len(split) >= 12 {
-			err = dataserver.UpdateControllerData(split, clientList)
+			err = dataserver.UpdateControllerData(split, clientList, producer)
 			if err != nil {
 				sentry.CaptureException(err)
 				continue
 			}
 		}
 		if split[0] == "PLAN" && len(split) >= 22 {
-			err = dataserver.UpdateFlightPlan(split, clientList)
+			err = dataserver.UpdateFlightPlan(split, clientList, producer)
 			if err != nil {
 				sentry.CaptureException(err)
 				continue
