@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"time"
+	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 // ClientList is a list of all clients currently connected to the network.
@@ -69,7 +70,12 @@ type FlightPlanTime struct {
 	Enroute   string `json:"enroute"`
 	Fuel      string `json:"fuel"`
 }
-
+// KafkaPayload used to format data sent to kafka
+type KafkaPayload struct {
+	MessageType string `json:"message_type"`
+	Data interface{} `json:"data"`
+	Timestamp time.Time `json:"timestamp"`
+}
 var (
 	// Cfg contains all of the necessary configuration data.
 	Cfg *config.Config
@@ -78,8 +84,22 @@ var (
 	Channel = make(chan ClientList)
 )
 
+func kafkaPush(producer *kafka.Producer, data interface{}, messageType string){
+	topic := "datafeed"
+	kafkaData := KafkaPayload{
+		MessageType: messageType,
+		Data: data,
+		Timestamp: time.Now().UTC(),
+	}
+	jsonData, _ := json.Marshal(kafkaData)
+	producer.Produce(&kafka.Message{
+			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+			Value:          []byte(jsonData),
+		}, nil)
+}
+
 // UpdatePosition updates a client's position data in the Client list and updates the JSON file.
-func UpdatePosition(split []string, clientList *ClientList) error {
+func UpdatePosition(split []string, clientList *ClientList, producer *kafka.Producer) error {
 	fmt.Printf("%+v Position Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[6])
 	latitude, err := convertStringToDouble(split[9])
 	if err != nil {
@@ -108,6 +128,7 @@ func UpdatePosition(split []string, clientList *ClientList) error {
 			*&clientList.PilotData[i].Altitude = altitude
 			*&clientList.PilotData[i].Speed = speed
 			*&clientList.PilotData[i].Heading = heading
+			kafkaPush(producer, clientList.PilotData[i], "update_position")
 			break
 		}
 	}
@@ -116,7 +137,7 @@ func UpdatePosition(split []string, clientList *ClientList) error {
 }
 
 // UpdateFlightPlan updates the flight plan entry for the specified callsign
-func UpdateFlightPlan(split []string, clientList *ClientList) error {
+func UpdateFlightPlan(split []string, clientList *ClientList, producer *kafka.Producer) error {
 	fmt.Printf("%+v Flight Plan Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[5])
 	cruiseSpeed, err := strconv.Atoi(split[9])
 	if err != nil {
@@ -160,6 +181,7 @@ func UpdateFlightPlan(split []string, clientList *ClientList) error {
 					Fuel:      fmt.Sprintf("%02d", fuelTimeHours) + fmt.Sprintf("%02d", fuelTimeMinutes),
 				},
 			}
+			kafkaPush(producer, clientList.PilotData[i].FlightPlan, "update_flight_plan")
 			break
 		}
 	}
@@ -193,7 +215,7 @@ func getHeading(split string) (int, error) {
 }
 
 // UpdateControllerData updates a controllers's data in the Client list and updates the JSON file.
-func UpdateControllerData(split []string, clientList *ClientList) error {
+func UpdateControllerData(split []string, clientList *ClientList, producer *kafka.Producer) error {
 	fmt.Printf("%+v Controller Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[5])
 	var frequency float32
 	var err error
@@ -228,6 +250,7 @@ func UpdateControllerData(split []string, clientList *ClientList) error {
 			*&clientList.ATCData[i].VisualRange = visualRange
 			*&clientList.ATCData[i].Latitude = latitude
 			*&clientList.ATCData[i].Longitude = longitude
+			kafkaPush(producer, clientList.ATCData[i], "update_controller_data")
 			break
 		}
 	}
@@ -236,17 +259,39 @@ func UpdateControllerData(split []string, clientList *ClientList) error {
 }
 
 // RemoveClient removes a client from the Client list and updates the JSON file.
-func RemoveClient(split []string, clientList *ClientList) error {
+func RemoveClient(split []string, clientList *ClientList, producer *kafka.Producer) error {
 	fmt.Printf("%+v Client Deleted: %+v\n", time.Now().UTC().Format(time.RFC3339), split[5])
 	for i, v := range clientList.PilotData {
 		if v.Callsign == split[5] {
 			*&clientList.PilotData = append(clientList.PilotData[:i], clientList.PilotData[i+1:]...)
+			data := PilotData{
+				Server:   split[2],
+				Callsign: split[5],
+				Member: MemberData{
+					CID:  0,
+					Name: "",
+				},
+			}
+
+		
+			kafkaPush(producer, data, "remove_client")
 			break
 		}
 	}
 	for i, v := range clientList.ATCData {
 		if v.Callsign == split[5] {
 			*&clientList.ATCData = append(clientList.ATCData[:i], clientList.ATCData[i+1:]...)
+			data := ATCData{
+				Server:   split[2],
+				Callsign: split[5],
+				Rating:   0,
+				Member: MemberData{
+					CID:  0,
+					Name: "",
+				},
+			}
+
+			kafkaPush(producer, data, "remove_client")
 			break
 		}
 	}
@@ -255,7 +300,7 @@ func RemoveClient(split []string, clientList *ClientList) error {
 }
 
 // AddClient adds a client to the Client list and updates the JSON file.
-func AddClient(split []string, clientList *ClientList) error {
+func AddClient(split []string, clientList *ClientList, producer *kafka.Producer) error {
 	fmt.Printf("%+v Client Added: %+v\n", time.Now().UTC().Format(time.RFC3339), split[7])
 	cid, err := strconv.Atoi(split[5])
 	if err != nil {
@@ -266,16 +311,20 @@ func AddClient(split []string, clientList *ClientList) error {
 		return errors.Wrapf(err, "Failed to get rating %+v", split[9])
 	}
 	if split[8] == "1" {
-		*&clientList.PilotData = append(clientList.PilotData, PilotData{
+
+		data := PilotData{
 			Server:   split[6],
 			Callsign: split[7],
 			Member: MemberData{
 				CID:  cid,
 				Name: split[11],
 			},
-		})
+		}
+		*&clientList.PilotData = append(clientList.PilotData, data)
+		kafkaPush(producer, data, "add_client")
 	} else if split[8] == "2" {
-		*&clientList.ATCData = append(clientList.ATCData, ATCData{
+
+		data := ATCData{
 			Server:   split[6],
 			Callsign: split[7],
 			Rating:   rating,
@@ -283,7 +332,10 @@ func AddClient(split []string, clientList *ClientList) error {
 				CID:  cid,
 				Name: split[11],
 			},
-		})
+		}
+
+		*&clientList.ATCData = append(clientList.ATCData, data)
+		kafkaPush(producer, data, "add_client")
 	}
 	Channel <- *clientList
 	return nil
