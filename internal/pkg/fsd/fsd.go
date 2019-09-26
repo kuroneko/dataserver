@@ -33,7 +33,7 @@ func Connect() net.Conn {
 func send(conn net.Conn, message string) error {
 	_, err := conn.Write([]byte(message + "\r\n"))
 	if err != nil {
-		return errors.Wrapf(err, "Failed to send packet to FSD server %+v", conn)
+		return errors.Wrapf(err, "Failed to send packet to FSD server. %+v", conn)
 	}
 	pdCount++
 	return nil
@@ -49,7 +49,7 @@ func ParseMessage(bytes []byte) []string {
 func ReadMessage(bufReader *bufio.Reader) ([]byte, error) {
 	bytes, err := bufReader.ReadBytes('\n')
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to read new FSD message from buffer reader %+v", bufReader)
+		return nil, errors.Wrapf(err, "Failed to read new FSD message from buffer reader. %+v", bufReader)
 	}
 	return bytes, nil
 }

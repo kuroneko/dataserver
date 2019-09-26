@@ -9,6 +9,7 @@ import (
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"io/ioutil"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -23,8 +24,8 @@ type PilotData struct {
 	Server     string     `json:"server"`
 	Callsign   string     `json:"callsign"`
 	Member     MemberData `json:"member"`
-	Latitude   float32    `json:"latitude"`
-	Longitude  float32    `json:"longitude"`
+	Latitude   float64    `json:"latitude"`
+	Longitude  float64    `json:"longitude"`
 	Altitude   int        `json:"altitude"`
 	Speed      int        `json:"speed"`
 	Heading    int        `json:"heading"`
@@ -46,8 +47,8 @@ type ATCData struct {
 	Frequency    string     `json:"frequency"`
 	FacilityType int        `json:"facility"`
 	VisualRange  int        `json:"range"`
-	Latitude     float32    `json:"latitude"`
-	Longitude    float32    `json:"longitude"`
+	Latitude     float64    `json:"latitude"`
+	Longitude    float64    `json:"longitude"`
 }
 
 // FlightPlan describes the data about a filed flight plan.
@@ -103,25 +104,25 @@ func kafkaPush(producer *kafka.Producer, data interface{}, messageType string) {
 // UpdatePosition updates a client's position data in the Client list and updates the JSON file.
 func UpdatePosition(split []string, clientList *ClientList, producer *kafka.Producer) error {
 	fmt.Printf("%+v Position Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[6])
-	latitude, err := convertStringToDouble(split[9])
+	latitude, err := strconv.ParseFloat(split[9], 64)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get latitude %+v", split[9])
+		return errors.Wrapf(err, "Failed to parse latitude. %+v", reassemble(split))
 	}
-	longitude, err := convertStringToDouble(split[10])
+	longitude, err := strconv.ParseFloat(split[10], 64)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get longitude %+v", split[10])
+		return errors.Wrapf(err, "Failed to parse longitude. %+v", reassemble(split))
 	}
 	altitude, err := strconv.Atoi(split[11])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get altitude %+v", split[11])
+		return errors.Wrapf(err, "Failed to parse altitude. %+v", reassemble(split))
 	}
 	speed, err := strconv.Atoi(split[12])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get speed %+v", split[12])
+		return errors.Wrapf(err, "Failed to parse speed. %+v", reassemble(split))
 	}
 	heading, err := getHeading(split[13])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get heading %+v", split[13])
+		return errors.Wrapf(err, "Failed to parse heading. %+v", reassemble(split))
 	}
 	for i, v := range clientList.PilotData {
 		if v.Callsign == split[6] {
@@ -143,27 +144,27 @@ func UpdateFlightPlan(split []string, clientList *ClientList, producer *kafka.Pr
 	fmt.Printf("%+v Flight Plan Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[5])
 	cruiseSpeed, err := strconv.Atoi(split[9])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get cruise speed %+v", split[9])
+		return errors.Wrapf(err, "Failed to parse cruise speed. %+v", reassemble(split))
 	}
 	departureTime, err := strconv.Atoi(split[11])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get departure time %+v", split[11])
+		return errors.Wrapf(err, "Failed to parse departure time. %+v", reassemble(split))
 	}
 	enrouteTimeHours, err := strconv.Atoi(split[15])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get enroute time hours %+v", split[15])
+		return errors.Wrapf(err, "Failed to parse enroute time hours. %+v", reassemble(split))
 	}
 	enrouteTimeMinutes, err := strconv.Atoi(split[16])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get enroute time minutes %+v", split[16])
+		return errors.Wrapf(err, "Failed to parse enroute time minutes. %+v", reassemble(split))
 	}
 	fuelTimeHours, err := strconv.Atoi(split[17])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get fuel time hours %+v", split[17])
+		return errors.Wrapf(err, "Failed to parse fuel time hours. %+v", reassemble(split))
 	}
 	fuelTimeMinutes, err := strconv.Atoi(split[18])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get fuel time minutes %+v", split[18])
+		return errors.Wrapf(err, "Failed to parse fuel time minutes. %+v", reassemble(split))
 	}
 	for i, v := range clientList.PilotData {
 		if v.Callsign == split[5] {
@@ -191,15 +192,6 @@ func UpdateFlightPlan(split []string, clientList *ClientList, producer *kafka.Pr
 	return nil
 }
 
-// convertStringToDouble converts a string to a float64
-func convertStringToDouble(string string) (float32, error) {
-	double, err := strconv.ParseFloat(string, 32)
-	if err != nil {
-		return 0, errors.Wrapf(err, "Failed to convert string to float32 %+v", string)
-	}
-	return float32(double), nil
-}
-
 // getHeading parses the PBH FSD value to extract the heading
 func getHeading(split string) (int, error) {
 	pbh, err := strconv.ParseUint(split, 10, 32)
@@ -219,31 +211,31 @@ func getHeading(split string) (int, error) {
 // UpdateControllerData updates a controllers's data in the Client list and updates the JSON file.
 func UpdateControllerData(split []string, clientList *ClientList, producer *kafka.Producer) error {
 	fmt.Printf("%+v Controller Update Received: %+v\n", time.Now().UTC().Format(time.RFC3339), split[5])
-	var frequency float32
+	var frequency float64
 	var err error
 	if len(split[6]) >= 5 {
-		frequency, err = convertStringToDouble("1" + split[6][0:2] + "." + split[6][2:5])
+		frequency, err = strconv.ParseFloat("1" + split[6][0:2] + "." + split[6][2:5], 64)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to get frequency %+v", split[6])
+			return errors.Wrapf(err, "Failed to parse frequency. %+v", reassemble(split))
 		}
 	} else {
-		return errors.New("Invalid frequency: " + split[6])
+		return errors.New("Invalid frequency. " + reassemble(split))
 	}
 	facilityType, err := strconv.Atoi(split[7])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get facility type %+v", split[7])
+		return errors.Wrapf(err, "Failed to parse facility type. %+v", reassemble(split))
 	}
 	visualRange, err := strconv.Atoi(split[8])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get visual range %+v", split[8])
+		return errors.Wrapf(err, "Failed to parse visual range. %+v", reassemble(split))
 	}
-	latitude, err := convertStringToDouble(split[10])
+	latitude, err := strconv.ParseFloat(split[10], 64)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get latitude %+v", split[10])
+		return errors.Wrapf(err, "Failed to parse latitude. %+v", reassemble(split))
 	}
-	longitude, err := convertStringToDouble(split[11])
+	longitude, err := strconv.ParseFloat(split[11], 64)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get longitude %+v", split[11])
+		return errors.Wrapf(err, "Failed to get longitude. %+v", reassemble(split))
 	}
 	for i, v := range clientList.ATCData {
 		if v.Callsign == split[5] {
@@ -305,14 +297,13 @@ func AddClient(split []string, clientList *ClientList, producer *kafka.Producer)
 	fmt.Printf("%+v Client Added: %+v\n", time.Now().UTC().Format(time.RFC3339), split[7])
 	cid, err := strconv.Atoi(split[5])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get CID %+v", split[5])
+		return errors.Wrapf(err, "Failed to parse CID. %+v", reassemble(split))
 	}
 	rating, err := strconv.Atoi(split[9])
 	if err != nil {
-		return errors.Wrapf(err, "Failed to get rating %+v", split[9])
+		return errors.Wrapf(err, "Failed to parse rating. %+v", reassemble(split))
 	}
 	if split[8] == "1" {
-
 		data := PilotData{
 			Server:   split[6],
 			Callsign: split[7],
@@ -324,7 +315,6 @@ func AddClient(split []string, clientList *ClientList, producer *kafka.Producer)
 		*&clientList.PilotData = append(clientList.PilotData, data)
 		kafkaPush(producer, data, "add_client")
 	} else if split[8] == "2" {
-
 		data := ATCData{
 			Server:   split[6],
 			Callsign: split[7],
@@ -350,7 +340,7 @@ func WriteDataFile(clientJSON []byte) error {
 	}
 	err = ioutil.WriteFile(directory+"vatsim-data.json", clientJSON, 0644)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
+		return errors.Wrapf(err, "Failed to write JSON to file. %+v", clientJSON)
 	}
 	return nil
 }
@@ -359,7 +349,7 @@ func WriteDataFile(clientJSON []byte) error {
 func EncodeJSON(clientList ClientList) ([]byte, error) {
 	clientJSON, err := json.Marshal(clientList)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
+		return nil, errors.Wrapf(err, "Failed to encode client list to JSON. %+v", clientList)
 	}
 	return clientJSON, nil
 }
@@ -389,4 +379,9 @@ func ConfigureSentry() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// reassemble puts the FSD packet back together for debugging
+func reassemble(split []string) string {
+	return strings.Join(split, ":")
 }

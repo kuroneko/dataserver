@@ -6,7 +6,6 @@ import (
 	"dataserver/internal/pkg/fsd"
 	"fmt"
 	"github.com/getsentry/sentry-go"
-	"github.com/pkg/errors"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"net"
 	"time"
@@ -105,11 +104,11 @@ func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net
 func updateFile(clientList dataserver.ClientList) error {
 	clientJSON, err := dataserver.EncodeJSON(clientList)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to encode client list to JSON %+v", clientList)
+		return err
 	}
 	err = dataserver.WriteDataFile(clientJSON)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to write JSON to file %+v", clientJSON)
+		return err
 	}
 	fmt.Printf("%+v Data file updated\n", time.Now().UTC().Format(time.RFC3339))
 	return nil
