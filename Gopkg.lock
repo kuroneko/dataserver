@@ -2,50 +2,20 @@
 
 
 [[projects]]
-  digest = "1:98c91886bc4fd2725ddd1bc10abfe282a21baf83aea089017c5ab5ed7e7027d5"
-  name = "github.com/bugsnag/bugsnag-go"
-  packages = [
-    ".",
-    "device",
-    "errors",
-    "headers",
-    "sessions",
-  ]
-  pruneopts = "UT"
-  revision = "ab96e5057f957e87c52f723c2fd25dcf9aa9130e"
-  version = "v1.5.2"
-
-[[projects]]
-  digest = "1:3049c43c6d1cfaa347acd27d6342187f8f38d9f416bbba7b02b43f82848302d2"
-  name = "github.com/bugsnag/panicwrap"
+  digest = "1:677e79698319e9718eb5fa13d55f0fd125f57b121db489ed8375f2e476cba4f4"
+  name = "github.com/getsentry/sentry-go"
   packages = ["."]
   pruneopts = "UT"
-  revision = "4009b2b7c78d820cc4a2e42f035bb557ce4ae45b"
-  version = "v1.2.0"
-
-[[projects]]
-  digest = "1:bed9d72d596f94e65fff37f4d6c01398074a6bb1c3f3ceff963516bd01db6ff5"
-  name = "github.com/gofrs/uuid"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "6b08a5c5172ba18946672b49749cde22873dd7c2"
-  version = "v3.2.0"
+  revision = "6e30a9909361d339adf28d4211947ef408cf7726"
+  version = "v0.3.0"
 
 [[projects]]
   branch = "master"
-  digest = "1:f433da6fbabb0bd1bd730fd340782015c644123d02eb78c20c69ce03352daad1"
-  name = "github.com/kardianos/osext"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "2bc1f35cddc0cc527b4bc3dce8578fc2a6c11384"
-
-[[projects]]
-  branch = "master"
-  digest = "1:2277d06c9dcd34d70119b624115f3d74672647322349bb76a8adedbc623a3955"
+  digest = "1:5eab0fcfd59da616531607af9526491b9e3ae53f4fe9fd9dc219e16e05cdf195"
   name = "github.com/olebedev/config"
   packages = ["."]
   pruneopts = "UT"
-  revision = "57f804269e64d41bfe46efb76232c47f49d40902"
+  revision = "364964f3a8e4646b0e2d37b12900e332dfded7c1"
 
 [[projects]]
   digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
@@ -54,6 +24,14 @@
   pruneopts = "UT"
   revision = "ba968bfe8b2f7e042a574c888954fccecfa385b4"
   version = "v0.8.1"
+
+[[projects]]
+  digest = "1:9169e569b3e6517da7de4476059f8fa889d508007e53fa5fc6a2ea4ffc5ae199"
+  name = "gopkg.in/confluentinc/confluent-kafka-go.v1"
+  packages = ["kafka"]
+  pruneopts = "UT"
+  revision = "48acc03b9ddd85b5c8c268b480d5a9a3d523b9ad"
+  version = "v1.1.0"
 
 [[projects]]
   digest = "1:4d2e5a73dc1500038e504a8d78b986630e3626dc027bc030ba5c75da257cdb96"
@@ -67,9 +45,10 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/bugsnag/bugsnag-go",
+    "github.com/getsentry/sentry-go",
     "github.com/olebedev/config",
     "github.com/pkg/errors",
+    "gopkg.in/confluentinc/confluent-kafka-go.v1/kafka",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -26,8 +26,20 @@
 
 
 [[constraint]]
+  name = "github.com/getsentry/sentry-go"
+  version = "0.3.0"
+
+[[constraint]]
   branch = "master"
   name = "github.com/olebedev/config"
+
+[[constraint]]
+  name = "github.com/pkg/errors"
+  version = "0.8.1"
+
+[[constraint]]
+  name = "gopkg.in/confluentinc/confluent-kafka-go.v1"
+  version = "1.1.0"
 
 [prune]
   go-tests = true
