@@ -6,8 +6,8 @@ import (
 	"dataserver/internal/pkg/fsd"
 	"fmt"
 	"github.com/getsentry/sentry-go"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"github.com/pkg/errors"
+	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"net"
 	"time"
 )

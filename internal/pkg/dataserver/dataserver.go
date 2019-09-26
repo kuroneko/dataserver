@@ -6,10 +6,10 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/olebedev/config"
 	"github.com/pkg/errors"
+	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"io/ioutil"
 	"strconv"
 	"time"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 // ClientList is a list of all clients currently connected to the network.
@@ -70,12 +70,14 @@ type FlightPlanTime struct {
 	Enroute   string `json:"enroute"`
 	Fuel      string `json:"fuel"`
 }
+
 // KafkaPayload used to format data sent to kafka
 type KafkaPayload struct {
-	MessageType string `json:"message_type"`
-	Data interface{} `json:"data"`
-	Timestamp time.Time `json:"timestamp"`
+	MessageType string      `json:"message_type"`
+	Data        interface{} `json:"data"`
+	Timestamp   time.Time   `json:"timestamp"`
 }
+
 var (
 	// Cfg contains all of the necessary configuration data.
 	Cfg *config.Config
@@ -84,18 +86,18 @@ var (
 	Channel = make(chan ClientList)
 )
 
-func kafkaPush(producer *kafka.Producer, data interface{}, messageType string){
+func kafkaPush(producer *kafka.Producer, data interface{}, messageType string) {
 	topic := "datafeed"
 	kafkaData := KafkaPayload{
 		MessageType: messageType,
-		Data: data,
-		Timestamp: time.Now().UTC(),
+		Data:        data,
+		Timestamp:   time.Now().UTC(),
 	}
 	jsonData, _ := json.Marshal(kafkaData)
 	producer.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-			Value:          []byte(jsonData),
-		}, nil)
+		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+		Value:          []byte(jsonData),
+	}, nil)
 }
 
 // UpdatePosition updates a client's position data in the Client list and updates the JSON file.
@@ -273,7 +275,6 @@ func RemoveClient(split []string, clientList *ClientList, producer *kafka.Produc
 				},
 			}
 
-		
 			kafkaPush(producer, data, "remove_client")
 			break
 		}
