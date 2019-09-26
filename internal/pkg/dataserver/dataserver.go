@@ -214,7 +214,7 @@ func UpdateControllerData(split []string, clientList *ClientList, producer *kafk
 	var frequency float64
 	var err error
 	if len(split[6]) >= 5 {
-		frequency, err = strconv.ParseFloat("1" + split[6][0:2] + "." + split[6][2:5], 64)
+		frequency, err = strconv.ParseFloat("1"+split[6][0:2]+"."+split[6][2:5], 64)
 		if err != nil {
 			return errors.Wrapf(err, "Failed to parse frequency. %+v", reassemble(split))
 		}
