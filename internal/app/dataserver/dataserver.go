@@ -5,7 +5,6 @@ import (
 	"dataserver/internal/pkg/dataserver"
 	"dataserver/internal/pkg/fsd"
 	"fmt"
-	"github.com/olebedev/config"
 	"github.com/getsentry/sentry-go"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"net"
@@ -43,11 +42,6 @@ func update() {
 		}
 	}
 }
-
-var (
-	// Cfg contains all of the necessary configuration data.
-	Cfg *config.Config
-)
 
 // listen continually reads, parses and handles FSD packets.
 func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net.Conn) {
