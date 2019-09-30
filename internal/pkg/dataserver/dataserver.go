@@ -79,10 +79,8 @@ type KafkaPayload struct {
 	Timestamp   time.Time   `json:"timestamp"`
 }
 
-
-	// Channel streams the clientList updates
-	var Channel = make(chan ClientList)
-
+// Channel streams the clientList updates
+var Channel = make(chan ClientList)
 
 func kafkaPush(producer *kafka.Producer, data interface{}, messageType string) {
 	topic := "datafeed"
@@ -190,7 +188,7 @@ func RemoveClient(split []string, clientList *ClientList, producer *kafka.Produc
 	for i, v := range clientList.PilotData {
 		if v.Callsign == removeClient.Callsign {
 			*&clientList.PilotData = append(clientList.PilotData[:i], clientList.PilotData[i+1:]...)
-		data := PilotData{
+			data := PilotData{
 				Server:   "",
 				Callsign: removeClient.Callsign,
 				Member: MemberData{
@@ -206,7 +204,7 @@ func RemoveClient(split []string, clientList *ClientList, producer *kafka.Produc
 	for i, v := range clientList.ATCData {
 		if v.Callsign == removeClient.Callsign {
 			*&clientList.ATCData = append(clientList.ATCData[:i], clientList.ATCData[i+1:]...)
-		data := ATCData{
+			data := ATCData{
 				Server:   "",
 				Callsign: removeClient.Callsign,
 				Rating:   0,
@@ -282,4 +280,3 @@ func EncodeJSON(clientList ClientList) ([]byte, error) {
 	}
 	return clientJSON, nil
 }
-
