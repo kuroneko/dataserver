@@ -37,7 +37,6 @@ func (a *AddClient) Parse(split []string) error {
 		a.Rating = rating
 		a.RealName = split[11]
 		return nil
-	} else {
-		return errors.Errorf("Invalid add client packet. +%v", reassemble(split))
 	}
+	return errors.Errorf("Invalid add client packet. +%v", reassemble(split))
 }

@@ -45,9 +45,8 @@ func (p *PilotData) Parse(split []string) error {
 		p.GroundSpeed = speed
 		p.Heading = heading
 		return nil
-	} else {
-		return errors.Errorf("Invalid pilot data packet. +%v", reassemble(split))
 	}
+	return errors.Errorf("Invalid pilot data packet. +%v", reassemble(split))
 }
 
 // getHeading parses the PBH FSD value to extract the heading

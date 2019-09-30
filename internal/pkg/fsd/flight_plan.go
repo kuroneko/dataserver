@@ -42,7 +42,6 @@ func (f *FlightPlan) Parse(split []string) error {
 		f.Remarks = split[20]
 		f.Route = split[21]
 		return nil
-	} else {
-		return errors.Errorf("Invalid flight plan packet. +%v", reassemble(split))
 	}
+	return errors.Errorf("Invalid flight plan packet. +%v", reassemble(split))
 }

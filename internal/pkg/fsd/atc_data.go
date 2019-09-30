@@ -45,7 +45,6 @@ func (a *ATCData) Parse(split []string) error {
 		a.Latitude = latitude
 		a.Longitude = longitude
 		return nil
-	} else {
-		return errors.Errorf("Invalid ATC data packet. +%v", reassemble(split))
 	}
+	return errors.Errorf("Invalid ATC data packet. +%v", reassemble(split))
 }

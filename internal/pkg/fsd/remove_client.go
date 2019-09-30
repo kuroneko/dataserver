@@ -14,7 +14,6 @@ func (r *RemoveClient) Parse(split []string) error {
 	if len(split) >= 6 {
 		r.Callsign = split[5]
 		return nil
-	} else {
-		return errors.Errorf("Invalid remove client packet. +%v", reassemble(split))
 	}
+	return errors.Errorf("Invalid remove client packet. +%v", reassemble(split))
 }
