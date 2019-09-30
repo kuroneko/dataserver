@@ -10,6 +10,7 @@ import (
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"net"
 	"time"
+	
 )
 
 // Start connects and begins parsing and saving data files.
@@ -46,7 +47,42 @@ func update() {
 // listen continually reads, parses and handles FSD packets.
 func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net.Conn) {
 	fmt.Printf("%+v Starting Kafka connection\n", time.Now().UTC().Format(time.RFC3339))
-	producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "localhost"})
+
+	kafkaServer, err := dataserver.Cfg.String("kafka.server")
+	if err != nil {
+		fmt.Printf("%+v Kafka server not defined.\n", time.Now().UTC().Format(time.RFC3339))
+		panic(err)
+	}
+	kafkaUsername, err := dataserver.Cfg.String("kafka.credentials.username")
+	if err != nil {
+		fmt.Printf("%+v Kafka username not defined.\n", time.Now().UTC().Format(time.RFC3339))
+		panic(err)
+	}	
+	kafkaPassword, err := dataserver.Cfg.String("kafka.credentials.password")
+	if err != nil {
+		fmt.Printf("%+v Kafka password not defined.\n", time.Now().UTC().Format(time.RFC3339))
+		panic(err)
+	}
+	kafkaProtocol, err := dataserver.Cfg.String("kafka.credentials.protocol")
+	if err != nil {
+		fmt.Printf("%+v Kafka protocol not defined.\n", time.Now().UTC().Format(time.RFC3339))
+		panic(err)
+	}
+	kafkaMechanism, err := dataserver.Cfg.String("kafka.credentials.mechanism")
+	if err != nil {
+		fmt.Printf("%+v Kafka authentication mechanism not defined.\n", time.Now().UTC().Format(time.RFC3339))
+		panic(err)
+	}
+
+	producer, err := kafka.NewProducer(&kafka.ConfigMap{
+		"bootstrap.servers": kafkaServer,
+		"sasl.username": kafkaUsername,
+		"sasl.password": kafkaPassword,
+		"security.protocol": kafkaProtocol,
+		"sasl.mechanism": kafkaMechanism,
+
+	})
+
 	if err != nil {
 		fmt.Printf("%+v Kafka connection failed\n", time.Now().UTC().Format(time.RFC3339))
 		panic(err)

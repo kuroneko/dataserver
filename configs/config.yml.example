@@ -10,3 +10,10 @@ data:
 sentry:
   credentials:
     dsn: dsn
+kafka:
+  server: xxx.xxx.xxx.xxx
+  credentials:
+    username: "xxxxx"
+    password: "xxxx"
+    protocol: "SASL_PLAINTEXT"
+    mechanism: "PLAIN"
