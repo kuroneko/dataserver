@@ -2,6 +2,7 @@ package dataserver
 
 import (
 	"bufio"
+	"dataserver/internal/pkg/config"
 	"dataserver/internal/pkg/dataserver"
 	"dataserver/internal/pkg/fsd"
 	"fmt"
@@ -13,8 +14,8 @@ import (
 
 // Start connects and begins parsing and saving data files.
 func Start() {
-	dataserver.ReadConfig()
-	dataserver.ConfigureSentry()
+	config.ReadConfig()
+	config.ConfigureSentry()
 	conn := fsd.Connect()
 	defer func() {
 		if err := conn.Close(); err != nil {
@@ -59,39 +60,31 @@ func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net
 			continue
 		}
 		split := fsd.ParseMessage(bytes)
-		processMessage(split, err, clientList, producer, conn)
+		processMessage(split, clientList, conn, producer)
 	}
 }
 
 // processMessage classifies the FSD packet and performs the appropriate action
-func processMessage(split []string, err error, clientList *dataserver.ClientList, producer *kafka.Producer, conn net.Conn) {
-	if split[0] == "ADDCLIENT" && len(split) >= 12 {
-		err = dataserver.AddClient(split, clientList, producer)
-		if err != nil {
-			sentry.CaptureException(err)
-		}
-	} else if split[0] == "RMCLIENT" && len(split) >= 6 {
-		err = dataserver.RemoveClient(split, clientList, producer)
-		if err != nil {
-			sentry.CaptureException(err)
-		}
-	} else if split[0] == "PD" && len(split) >= 13 {
-		err = dataserver.UpdatePosition(split, clientList, producer)
-		if err != nil {
-			sentry.CaptureException(err)
-		}
-	} else if split[0] == "AD" && len(split) >= 12 {
-		err = dataserver.UpdateControllerData(split, clientList, producer)
-		if err != nil {
-			sentry.CaptureException(err)
-		}
-	} else if split[0] == "PLAN" && len(split) >= 22 {
-		err = dataserver.UpdateFlightPlan(split, clientList, producer)
-		if err != nil {
-			sentry.CaptureException(err)
-		}
+func processMessage(split []string, clientList *dataserver.ClientList, conn net.Conn, producer *kafka.Producer) {
+	if split[0] == "ADDCLIENT" {
+		checkError(dataserver.AddClient(split, clientList, producer))
+	} else if split[0] == "RMCLIENT" {
+		checkError(dataserver.RemoveClient(split, clientList, producer))
+	} else if split[0] == "PD" {
+		checkError(dataserver.UpdatePosition(split, clientList, producer))
+	} else if split[0] == "AD" {
+		checkError(dataserver.UpdateControllerData(split, clientList, producer))
+	} else if split[0] == "PLAN" {
+		checkError(dataserver.UpdateFlightPlan(split, clientList, producer))
 	} else if split[0] == "PING" && len(split) >= 6 {
 		fsd.Pong(conn, split)
+	}
+}
+
+// checkError checks if an error occurred and reports it to Sentry
+func checkError(err error) {
+	if err != nil {
+		sentry.CaptureException(err)
 	}
 }
 

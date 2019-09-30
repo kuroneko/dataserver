@@ -2,7 +2,7 @@ package fsd
 
 import (
 	"bufio"
-	"dataserver/internal/pkg/dataserver"
+	"dataserver/internal/pkg/config"
 	"github.com/pkg/errors"
 	"net"
 	"strconv"
@@ -14,11 +14,11 @@ var pdCount int
 
 // Connect establishes a connection to the FSD server.
 func Connect() net.Conn {
-	ip, err := dataserver.Cfg.String("fsd.server.ip")
+	ip, err := config.Cfg.String("fsd.server.ip")
 	if err != nil {
 		panic(err)
 	}
-	port, err := dataserver.Cfg.String("fsd.server.port")
+	port, err := config.Cfg.String("fsd.server.port")
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +56,7 @@ func ReadMessage(bufReader *bufio.Reader) ([]byte, error) {
 
 // Sync sends a sync packet to the FSD server.
 func Sync(conn net.Conn) {
-	name, err := dataserver.Cfg.String("data.server.name")
+	name, err := config.Cfg.String("data.server.name")
 	if err != nil {
 		panic(err)
 	}
@@ -68,7 +68,7 @@ func Sync(conn net.Conn) {
 
 // Pong returns an FSD server's ping request.
 func Pong(conn net.Conn, split []string) {
-	name, err := dataserver.Cfg.String("data.server.name")
+	name, err := config.Cfg.String("data.server.name")
 	if err != nil {
 		panic(err)
 	}
@@ -82,4 +82,9 @@ func Pong(conn net.Conn, split []string) {
 func SetupReader(conn net.Conn) *bufio.Reader {
 	bufReader := bufio.NewReader(conn)
 	return bufReader
+}
+
+// reassemble puts the FSD packet back together for debugging
+func reassemble(split []string) string {
+	return strings.Join(split, ":")
 }
