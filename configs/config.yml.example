@@ -17,3 +17,22 @@ kafka:
     password: "xxxx"
     protocol: "SASL_PLAINTEXT"
     mechanism: "PLAIN"
+s3:
+  us:
+    endpoint: sfo2.digitaloceanspaces.com
+    accessKeyID: XXXXXXX
+    secretAccessKey: XXXXXXX
+    bucketName: vatsim-data-us
+    region: sfo2
+  eu:
+    endpoint: fra1.digitaloceanspaces.com
+    accessKeyID: XXXXXXX
+    secretAccessKey: XXXXXXX
+    bucketName: vatsim-data-eu
+    region: fra1
+  apac:
+    endpoint: sgp1.digitaloceanspaces.com
+    accessKeyID: XXXXXXX
+    secretAccessKey: XXXXXXX
+    bucketName: vatsim-data-apac
+    region: sgp1
