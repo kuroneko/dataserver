@@ -73,6 +73,7 @@ func ConfigureKafka() *kafka.Producer {
 		"sasl.password":     kafkaPassword,
 		"security.protocol": kafkaProtocol,
 		"sasl.mechanism":    kafkaMechanism,
+		"go.delivery.reports": false,
 	})
 	if err != nil {
 		fmt.Printf("%+v Kafka connection failed\n", time.Now().UTC().Format(time.RFC3339))
