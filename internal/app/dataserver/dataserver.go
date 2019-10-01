@@ -7,16 +7,18 @@ import (
 	"dataserver/internal/pkg/fsd"
 	"fmt"
 	"github.com/getsentry/sentry-go"
+	"github.com/minio/minio-go"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"net"
 	"time"
-    "github.com/minio/minio-go"	
 )
 
 // Start connects and begins parsing and saving data files.
 func Start() {
 	config.ReadConfig()
 	config.ConfigureSentry()
+	producer := config.ConfigureKafka()
+	defer producer.Close()
 	conn := fsd.Connect()
 	defer func() {
 		if err := conn.Close(); err != nil {
@@ -27,7 +29,7 @@ func Start() {
 	fsd.Sync(conn)
 	clientList := &dataserver.ClientList{}
 	go update()
-	listen(bufReader, clientList, conn)
+	listen(bufReader, clientList, conn, producer)
 }
 
 // update handles the creation of a 15 second ticker for updating the data file
@@ -35,60 +37,14 @@ func update() {
 	now := time.Now().UTC()
 	for clientList := range dataserver.Channel {
 		if time.Since(now) >= (15 * time.Second) {
-			err := updateFile(clientList)
-			if err != nil {
-				sentry.CaptureException(err)
-			}
+			checkError(updateFile(clientList))
 			now = time.Now().UTC()
 		}
 	}
 }
 
 // listen continually reads, parses and handles FSD packets.
-func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net.Conn) {
-	fmt.Printf("%+v Starting Kafka connection\n", time.Now().UTC().Format(time.RFC3339))
-
-	kafkaServer, err := config.Cfg.String("kafka.server")
-	if err != nil {
-		fmt.Printf("%+v Kafka server not defined.\n", time.Now().UTC().Format(time.RFC3339))
-		panic(err)
-	}
-	kafkaUsername, err := config.Cfg.String("kafka.credentials.username")
-	if err != nil {
-		fmt.Printf("%+v Kafka username not defined.\n", time.Now().UTC().Format(time.RFC3339))
-		panic(err)
-	}	
-	kafkaPassword, err := config.Cfg.String("kafka.credentials.password")
-	if err != nil {
-		fmt.Printf("%+v Kafka password not defined.\n", time.Now().UTC().Format(time.RFC3339))
-		panic(err)
-	}
-	kafkaProtocol, err := config.Cfg.String("kafka.credentials.protocol")
-	if err != nil {
-		fmt.Printf("%+v Kafka protocol not defined.\n", time.Now().UTC().Format(time.RFC3339))
-		panic(err)
-	}
-	kafkaMechanism, err := config.Cfg.String("kafka.credentials.mechanism")
-	if err != nil {
-		fmt.Printf("%+v Kafka authentication mechanism not defined.\n", time.Now().UTC().Format(time.RFC3339))
-		panic(err)
-	}
-
-	producer, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": kafkaServer,
-		"sasl.username": kafkaUsername,
-		"sasl.password": kafkaPassword,
-		"security.protocol": kafkaProtocol,
-		"sasl.mechanism": kafkaMechanism,
-
-	})
-
-	if err != nil {
-		fmt.Printf("%+v Kafka connection failed\n", time.Now().UTC().Format(time.RFC3339))
-		panic(err)
-	}
-	fmt.Printf("%+v Kafka connected\n", time.Now().UTC().Format(time.RFC3339))
-	defer producer.Close()
+func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net.Conn, producer *kafka.Producer) {
 	for {
 		bytes, err := fsd.ReadMessage(bufReader)
 		if err != nil {
@@ -136,23 +92,23 @@ func updateFile(clientList dataserver.ClientList) error {
 	}
 	fmt.Printf("%+v Data file updated\n", time.Now().UTC().Format(time.RFC3339))
 	s3Push()
-	
+
 	return nil
 }
 
-func s3Push(){
+// s3Push sets up  the S3 library and begins the goroutine
+func s3Push() {
 	s3Config, err := config.Cfg.Map("s3")
 	if err != nil {
-
+		panic(err)
 	}
 	for k := range s3Config {
 		go s3Loop(k)
-	
 	}
 }
 
-func s3Loop(k string){
-
+// s3Loop pushes the data files to S3
+func s3Loop(k string) {
 	endPoint, _ := config.Cfg.String(fmt.Sprintf("s3.%s.endpoint", k))
 	accessKeyID, _ := config.Cfg.String(fmt.Sprintf("s3.%s.accessKeyID", k))
 	secretAccessKey, _ := config.Cfg.String(fmt.Sprintf("s3.%s.secretAccessKey", k))
@@ -160,16 +116,15 @@ func s3Loop(k string){
 	contentType := "application/json"
 	objectName := "vatsim-data.json"
 	userMetaData := map[string]string{"x-amz-acl": "public-read"}
-	
+
 	minioClient, err := minio.New(endPoint, accessKeyID, secretAccessKey, true)
 	if err != nil {
 		sentry.CaptureException(err)
 	}
 
-	n, err := minioClient.FPutObject(bucketName, objectName, "directoryvatsim-data.json", minio.PutObjectOptions{ContentType:contentType, UserMetadata: userMetaData})
+	n, err := minioClient.FPutObject(bucketName, objectName, "directoryvatsim-data.json", minio.PutObjectOptions{ContentType: contentType, UserMetadata: userMetaData})
 	if err != nil {
 		sentry.CaptureException(err)
 	}
 	fmt.Printf("%+v Successfully uploaded %s of size %d\n", time.Now().UTC().Format(time.RFC3339), objectName, n)
-
 }
