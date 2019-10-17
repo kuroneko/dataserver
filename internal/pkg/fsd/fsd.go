@@ -1,10 +1,9 @@
 package fsd
 
 import (
-	"bufio"
 	"dataserver/internal/pkg/config"
 	"github.com/pkg/errors"
-	"net"
+	"net/textproto"
 	"strconv"
 	"strings"
 )
@@ -13,7 +12,7 @@ import (
 var pdCount int
 
 // Connect establishes a connection to the FSD server.
-func Connect() net.Conn {
+func Connect() *textproto.Conn {
 	ip, err := config.Cfg.String("fsd.server.ip")
 	if err != nil {
 		panic(err)
@@ -22,7 +21,7 @@ func Connect() net.Conn {
 	if err != nil {
 		panic(err)
 	}
-	conn, err := net.Dial("tcp", ip+":"+port)
+	conn, err := textproto.Dial("tcp", ip+":"+port)
 	if err != nil {
 		panic(err)
 	}
@@ -30,8 +29,8 @@ func Connect() net.Conn {
 }
 
 // send formats and sends a new FSD packet to the FSD server.
-func send(conn net.Conn, message string) error {
-	_, err := conn.Write([]byte(message + "\r\n"))
+func send(conn *textproto.Conn, message string) error {
+	_, err := conn.Cmd(message)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to send packet to FSD server. %+v", conn)
 	}
@@ -40,22 +39,22 @@ func send(conn net.Conn, message string) error {
 }
 
 // ParseMessage splits an FSD message based on the colon delimiter for further handling.
-func ParseMessage(bytes []byte) []string {
-	split := strings.Split(strings.Trim(string(bytes), " \r\n"), ":")
+func ParseMessage(message string) []string {
+	split := strings.Split(message, ":")
 	return split
 }
 
-// ReadMessage reads a new FSD message from the buffer reader.
-func ReadMessage(bufReader *bufio.Reader) ([]byte, error) {
-	bytes, err := bufReader.ReadBytes('\n')
+// ReadMessage reads a new FSD message from the connection.
+func ReadMessage(conn *textproto.Conn) (string, error) {
+	message, err := conn.ReadLine()
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to read new FSD message from buffer reader. %+v", bufReader)
+		return "", errors.Wrapf(err, "Failed to read new FSD message from connection. %+v", conn)
 	}
-	return bytes, nil
+	return message, nil
 }
 
 // Sync sends a sync packet to the FSD server.
-func Sync(conn net.Conn) {
+func Sync(conn *textproto.Conn) {
 	name, err := config.Cfg.String("data.server.name")
 	if err != nil {
 		panic(err)
@@ -67,7 +66,7 @@ func Sync(conn net.Conn) {
 }
 
 // Pong returns an FSD server's ping request.
-func Pong(conn net.Conn, split []string) {
+func Pong(conn *textproto.Conn, split []string) {
 	name, err := config.Cfg.String("data.server.name")
 	if err != nil {
 		panic(err)
@@ -76,12 +75,6 @@ func Pong(conn net.Conn, split []string) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-// SetupReader wraps the FSD connection in a buffered reader for easier ingestion.
-func SetupReader(conn net.Conn) *bufio.Reader {
-	bufReader := bufio.NewReader(conn)
-	return bufReader
 }
 
 // reassemble puts the FSD packet back together for debugging

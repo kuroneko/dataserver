@@ -1,35 +1,63 @@
 package dataserver
 
 import (
-	"bufio"
 	"dataserver/internal/pkg/config"
 	"dataserver/internal/pkg/dataserver"
 	"dataserver/internal/pkg/fsd"
 	"fmt"
 	"github.com/getsentry/sentry-go"
 	"github.com/minio/minio-go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
-	"net"
+	"net/http"
+	"net/textproto"
 	"time"
+)
+
+var (
+	packetsProcessed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "dataserver_packets_processed",
+		Help: "The total number of processed packets.",
+	})
+
+	timeToProcessPacket = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name: "dataserver_time_to_process_packet",
+		Help: "The time to process a packet sent by FSD.",
+	})
 )
 
 // Start connects and begins parsing and saving data files.
 func Start() {
+	// Configuration
 	config.ReadConfig()
 	config.ConfigureSentry()
 	producer := config.ConfigureKafka()
 	defer producer.Close()
+
+	// Connect to FSD
 	conn := fsd.Connect()
 	defer func() {
 		if err := conn.Close(); err != nil {
 			sentry.CaptureException(err)
 		}
 	}()
-	bufReader := fsd.SetupReader(conn)
 	fsd.Sync(conn)
+
+	// Instantiate empty client list and begin listening for updates
 	clientList := &dataserver.ClientList{}
 	go update()
-	listen(bufReader, clientList, conn, producer)
+	go exposeMetrics()
+	listen(clientList, conn, producer)
+}
+
+func exposeMetrics() {
+	http.Handle("/metrics", promhttp.Handler())
+	err := http.ListenAndServe(":2112", nil)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // update handles the creation of a 15 second ticker for updating the data file
@@ -44,20 +72,22 @@ func update() {
 }
 
 // listen continually reads, parses and handles FSD packets.
-func listen(bufReader *bufio.Reader, clientList *dataserver.ClientList, conn net.Conn, producer *kafka.Producer) {
+func listen(clientList *dataserver.ClientList, conn *textproto.Conn, producer *kafka.Producer) {
 	for {
-		bytes, err := fsd.ReadMessage(bufReader)
+		bytes, err := fsd.ReadMessage(conn)
+		timer := prometheus.NewTimer(timeToProcessPacket)
 		if err != nil {
 			sentry.CaptureException(err)
 			continue
 		}
 		split := fsd.ParseMessage(bytes)
 		processMessage(split, clientList, conn, producer)
+		timer.ObserveDuration()
 	}
 }
 
 // processMessage classifies the FSD packet and performs the appropriate action
-func processMessage(split []string, clientList *dataserver.ClientList, conn net.Conn, producer *kafka.Producer) {
+func processMessage(split []string, clientList *dataserver.ClientList, conn *textproto.Conn, producer *kafka.Producer) {
 	if split[0] == "ADDCLIENT" {
 		checkError(dataserver.AddClient(split, clientList, producer))
 	} else if split[0] == "RMCLIENT" {
@@ -71,6 +101,7 @@ func processMessage(split []string, clientList *dataserver.ClientList, conn net.
 	} else if split[0] == "PING" && len(split) >= 6 {
 		fsd.Pong(conn, split)
 	}
+	packetsProcessed.Inc()
 }
 
 // checkError checks if an error occurred and reports it to Sentry

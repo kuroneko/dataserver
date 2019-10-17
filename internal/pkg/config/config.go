@@ -68,11 +68,11 @@ func ConfigureKafka() *kafka.Producer {
 		panic(err)
 	}
 	producer, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": kafkaServer,
-		"sasl.username":     kafkaUsername,
-		"sasl.password":     kafkaPassword,
-		"security.protocol": kafkaProtocol,
-		"sasl.mechanism":    kafkaMechanism,
+		"bootstrap.servers":   kafkaServer,
+		"sasl.username":       kafkaUsername,
+		"sasl.password":       kafkaPassword,
+		"security.protocol":   kafkaProtocol,
+		"sasl.mechanism":      kafkaMechanism,
 		"go.delivery.reports": false,
 	})
 	if err != nil {

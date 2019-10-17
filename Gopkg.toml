@@ -30,12 +30,20 @@
   version = "0.3.0"
 
 [[constraint]]
+  name = "github.com/minio/minio-go"
+  version = "6.0.25"
+
+[[constraint]]
   branch = "master"
   name = "github.com/olebedev/config"
 
 [[constraint]]
   name = "github.com/pkg/errors"
   version = "0.8.1"
+
+[[constraint]]
+  name = "github.com/prometheus/client_golang"
+  version = "1.1.0"
 
 [[constraint]]
   name = "gopkg.in/confluentinc/confluent-kafka-go.v1"

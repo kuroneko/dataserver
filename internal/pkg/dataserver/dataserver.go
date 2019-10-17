@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"io/ioutil"
 	"time"
@@ -80,8 +82,16 @@ type KafkaPayload struct {
 }
 
 // Channel streams the clientList updates
-var Channel = make(chan ClientList)
+var (
+	Channel = make(chan ClientList)
 
+	totalConnections = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "dataserver_connections_total",
+		Help: "The total number of FSD connections.",
+	}, []string{"server"})
+)
+
+// kafkaPush publishes to the Kafka feed
 func kafkaPush(producer *kafka.Producer, data interface{}, messageType string) {
 	topic := "datafeed"
 	kafkaData := KafkaPayload{
@@ -218,6 +228,7 @@ func RemoveClient(split []string, clientList *ClientList, producer *kafka.Produc
 			break
 		}
 	}
+	totalConnections.With(prometheus.Labels{"server": removeClient.Server}).Dec()
 	fmt.Printf("%+v Client Deleted: %+v\n", time.Now().UTC().Format(time.RFC3339), removeClient.Callsign)
 	Channel <- *clientList
 	return nil
@@ -254,6 +265,7 @@ func AddClient(split []string, clientList *ClientList, producer *kafka.Producer)
 		*&clientList.ATCData = append(clientList.ATCData, data)
 		kafkaPush(producer, data, "add_client")
 	}
+	totalConnections.With(prometheus.Labels{"server": addClient.Server}).Inc()
 	fmt.Printf("%+v Client Added: %+v\n", time.Now().UTC().Format(time.RFC3339), addClient.Callsign)
 	Channel <- *clientList
 	return nil
