@@ -1,50 +1,106 @@
 package fsd
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"strconv"
+	"strings"
 )
 
-// ATCData is the packet sent to update data about a controller
+// ATCData AD
 type ATCData struct {
+	Base
 	Callsign     string
 	Frequency    int
 	FacilityType int
 	VisualRange  int
+	Rating       int
 	Latitude     float64
 	Longitude    float64
 }
 
-// Parse parses an AD packet from FSD
-func (a *ATCData) Parse(split []string) error {
-	if len(split) >= 12 {
-		frequency, err := strconv.Atoi(split[6])
+// Serialize converts a struct into an FSD packet
+func (a ATCData) Serialize() string {
+	msg := strings.Builder{}
+	msg.WriteString("AD")
+	msg.WriteString(":")
+	msg.WriteString(a.Destination)
+	msg.WriteString(":")
+	msg.WriteString(a.Source)
+	msg.WriteString(":")
+	msg.WriteString("B")
+	msg.WriteString(strconv.Itoa(a.PacketNumber))
+	msg.WriteString(":")
+	msg.WriteString(strconv.Itoa(a.HopCount))
+	msg.WriteString(":")
+	msg.WriteString(a.Callsign)
+	msg.WriteString(":")
+	msg.WriteString(strconv.Itoa(a.Frequency))
+	msg.WriteString(":")
+	msg.WriteString(strconv.Itoa(a.FacilityType))
+	msg.WriteString(":")
+	msg.WriteString(strconv.Itoa(a.VisualRange))
+	msg.WriteString(":")
+	msg.WriteString(strconv.Itoa(a.Rating))
+	msg.WriteString(":")
+	msg.WriteString(fmt.Sprintf("%f", a.Latitude))
+	msg.WriteString(":")
+	msg.WriteString(fmt.Sprintf("%f", a.Longitude))
+	msg.WriteString(":")
+	msg.WriteString("0") // Transceiver altitude
+	return msg.String()
+}
+
+// DeserializeATCData maps an array of strings to an AddClient struct
+func DeserializeATCData(fields []string) (ATCData, error) {
+	if len(fields) >= 13 {
+		packetNumber, err := strconv.Atoi(fields[3][1:])
 		if err != nil {
-			return errors.Wrapf(err, "Failed to parse frequency. %+v", reassemble(split))
+			return ATCData{}, errors.Wrapf(err, "Failed to parse packet number. %v", reassemble(fields))
 		}
-		facilityType, err := strconv.Atoi(split[7])
+		hopCount, err := strconv.Atoi(fields[4])
 		if err != nil {
-			return errors.Wrapf(err, "Failed to parse facility type. %+v", reassemble(split))
+			return ATCData{}, errors.Wrapf(err, "Failed to parse hop count. %v", reassemble(fields))
 		}
-		visualRange, err := strconv.Atoi(split[8])
+		frequency, err := strconv.Atoi(fields[6])
 		if err != nil {
-			return errors.Wrapf(err, "Failed to parse visual range. %+v", reassemble(split))
+			return ATCData{}, errors.Wrapf(err, "Failed to parse frequency. %v", reassemble(fields))
 		}
-		latitude, err := strconv.ParseFloat(split[10], 64)
+		facilityType, err := strconv.Atoi(fields[7])
 		if err != nil {
-			return errors.Wrapf(err, "Failed to parse latitude. %+v", reassemble(split))
+			return ATCData{}, errors.Wrapf(err, "Failed to parse facility type. %v", reassemble(fields))
 		}
-		longitude, err := strconv.ParseFloat(split[11], 64)
+		visualRange, err := strconv.Atoi(fields[8])
 		if err != nil {
-			return errors.Wrapf(err, "Failed to get longitude. %+v", reassemble(split))
+			return ATCData{}, errors.Wrapf(err, "Failed to parse visual range. %v", reassemble(fields))
 		}
-		a.Callsign = split[5]
-		a.Frequency = frequency
-		a.FacilityType = facilityType
-		a.VisualRange = visualRange
-		a.Latitude = latitude
-		a.Longitude = longitude
-		return nil
+		rating, err := strconv.Atoi(fields[9])
+		if err != nil {
+			return ATCData{}, errors.Wrapf(err, "Failed to parse rating. %v", reassemble(fields))
+		}
+		latitude, err := strconv.ParseFloat(fields[10], 64)
+		if err != nil {
+			return ATCData{}, errors.Wrapf(err, "Failed to parse latitude. %v", reassemble(fields))
+		}
+		longitude, err := strconv.ParseFloat(fields[11], 64)
+		if err != nil {
+			return ATCData{}, errors.Wrapf(err, "Failed to get longitude. %v", reassemble(fields))
+		}
+		return ATCData{
+			Base: Base{
+				Destination:  fields[1],
+				Source:       fields[2],
+				PacketNumber: packetNumber,
+				HopCount:     hopCount,
+			},
+			Callsign:     fields[5],
+			Frequency:    frequency,
+			FacilityType: facilityType,
+			VisualRange:  visualRange,
+			Rating:       rating,
+			Latitude:     latitude,
+			Longitude:    longitude,
+		}, nil
 	}
-	return errors.Errorf("Invalid ATC data packet. +%v", reassemble(split))
+	return ATCData{}, errors.Errorf("Invalid packet. %v", reassemble(fields))
 }

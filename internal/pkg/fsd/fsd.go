@@ -3,38 +3,48 @@ package fsd
 import (
 	"dataserver/internal/pkg/config"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"net/textproto"
-	"strconv"
 	"strings"
 )
 
 // pdCount is a count of the number of packets we have sent to the FSD server.
-var pdCount int
+var PdCount int
 
 // Connect establishes a connection to the FSD server.
 func Connect() *textproto.Conn {
 	ip, err := config.Cfg.String("fsd.server.ip")
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"config": config.Cfg,
+			"error":  err,
+		}).Fatal("Failed to get FSD IP from configuration.")
 	}
 	port, err := config.Cfg.String("fsd.server.port")
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"config": config.Cfg,
+			"error":  err,
+		}).Fatal("Failed to get FSD port from configuration.")
 	}
 	conn, err := textproto.Dial("tcp", ip+":"+port)
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"ip":    ip,
+			"port":  port,
+			"error": err,
+		}).Fatal("Failed to connect to FSD server.")
 	}
 	return conn
 }
 
 // send formats and sends a new FSD packet to the FSD server.
-func send(conn *textproto.Conn, message string) error {
+func Send(conn *textproto.Conn, message string) error {
 	_, err := conn.Cmd(message)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to send packet to FSD server. %+v", conn)
 	}
-	pdCount++
+	PdCount++
 	return nil
 }
 
@@ -57,27 +67,65 @@ func ReadMessage(conn *textproto.Conn) (string, error) {
 func Sync(conn *textproto.Conn) {
 	name, err := config.Cfg.String("data.server.name")
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"config": config.Cfg,
+			"error":  err,
+		}).Fatal("Failed to get server name from configuration.")
 	}
-	err = send(conn, "SYNC:*:"+name+":B1:1:")
+	err = Send(conn, "SYNC:*:"+name+":B1:1:")
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"connection": conn,
+			"error":      err,
+		}).Fatal("Failed to send SYNC packet to FSD server.")
 	}
 }
 
-// Pong returns an FSD server's ping request.
-func Pong(conn *textproto.Conn, split []string) {
+// SendNotify sends a notify packet to create our FSD server
+func SendNotify(conn *textproto.Conn) {
 	name, err := config.Cfg.String("data.server.name")
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"config": config.Cfg,
+			"error":  err,
+		}).Fatal("Failed to get dataserver name from configuration.")
 	}
-	err = send(conn, "PONG:"+split[2]+":"+name+":U"+strconv.Itoa(pdCount)+":1"+split[5])
+	email, err := config.Cfg.String("data.server.email")
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"config": config.Cfg,
+			"error":  err,
+		}).Fatal("Failed to get dataserver email from configuration.")
 	}
-}
-
-// reassemble puts the FSD packet back together for debugging
-func reassemble(split []string) string {
-	return strings.Join(split, ":")
+	location, err := config.Cfg.String("data.server.location")
+	if err != nil {
+		log.WithFields(log.Fields{
+			"config": config.Cfg,
+			"error":  err,
+		}).Fatal("Failed to get dataserver location from configuration.")
+	}
+	notify := Notify{
+		Base: Base{
+			Destination:  "*",
+			Source:       name,
+			PacketNumber: PdCount,
+			HopCount:     1,
+		},
+		FeedFlag: 0,
+		Ident:    name,
+		Name:     name,
+		Email:    email,
+		Hostname: "127.0.0.1",
+		Version:  "v1.0",
+		Flags:    0,
+		Location: location,
+	}
+	err = Send(conn, notify.Serialize())
+	if err != nil {
+		log.WithFields(log.Fields{
+			"connection": conn,
+			"error":      err,
+		}).Fatal("Failed to send SYNC packet to FSD server.")
+	}
+	log.WithField("packet", notify.Serialize()).Info("Successfully sent NOTIFY packet.")
 }

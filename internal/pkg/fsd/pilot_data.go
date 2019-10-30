@@ -5,9 +5,13 @@ import (
 	"strconv"
 )
 
-// PilotData is the packet sent to update data about a pilot
+// PilotData PD
 type PilotData struct {
+	Base
+	IdentFlag   string
 	Callsign    string
+	Transponder int
+	Rating      int
 	Latitude    float64
 	Longitude   float64
 	Altitude    int
@@ -15,45 +19,71 @@ type PilotData struct {
 	Heading     int
 }
 
-// Parse parses a PD packet from FSD
-func (p *PilotData) Parse(split []string) error {
-	if len(split) >= 13 {
-		latitude, err := strconv.ParseFloat(split[9], 64)
+// DeserializePilotData maps an array of strings to a PilotData struct
+func DeserializePilotData(fields []string) (PilotData, error) {
+	if len(fields) >= 14 {
+		packetNumber, err := strconv.Atoi(fields[3][1:])
 		if err != nil {
-			return errors.Wrapf(err, "Failed to parse latitude. %+v", reassemble(split))
+			return PilotData{}, errors.Wrapf(err, "Failed to parse packet number. %v", reassemble(fields))
 		}
-		longitude, err := strconv.ParseFloat(split[10], 64)
+		hopCount, err := strconv.Atoi(fields[4])
 		if err != nil {
-			return errors.Wrapf(err, "Failed to parse longitude. %+v", reassemble(split))
+			return PilotData{}, errors.Wrapf(err, "Failed to parse hop count. %v", reassemble(fields))
 		}
-		altitude, err := strconv.Atoi(split[11])
+		transponder, err := strconv.Atoi(fields[7])
 		if err != nil {
-			return errors.Wrapf(err, "Failed to parse altitude. %+v", reassemble(split))
+			return PilotData{}, errors.Wrapf(err, "Failed to parse transponder. %v", reassemble(fields))
 		}
-		speed, err := strconv.Atoi(split[12])
+		rating, err := strconv.Atoi(fields[8])
 		if err != nil {
-			return errors.Wrapf(err, "Failed to parse speed. %+v", reassemble(split))
+			return PilotData{}, errors.Wrapf(err, "Failed to parse rating. %v", reassemble(fields))
 		}
-		heading, err := getHeading(split[13])
+		latitude, err := strconv.ParseFloat(fields[9], 64)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to parse heading. %+v", reassemble(split))
+			return PilotData{}, errors.Wrapf(err, "Failed to parse latitude. %v", reassemble(fields))
 		}
-		p.Callsign = split[6]
-		p.Latitude = latitude
-		p.Longitude = longitude
-		p.Altitude = altitude
-		p.GroundSpeed = speed
-		p.Heading = heading
-		return nil
+		longitude, err := strconv.ParseFloat(fields[10], 64)
+		if err != nil {
+			return PilotData{}, errors.Wrapf(err, "Failed to parse longitude. %v", reassemble(fields))
+		}
+		altitude, err := strconv.Atoi(fields[11])
+		if err != nil {
+			return PilotData{}, errors.Wrapf(err, "Failed to parse altitude. %v", reassemble(fields))
+		}
+		speed, err := strconv.Atoi(fields[12])
+		if err != nil {
+			return PilotData{}, errors.Wrapf(err, "Failed to parse speed. %v", reassemble(fields))
+		}
+		heading, err := getHeading(fields[13])
+		if err != nil {
+			return PilotData{}, errors.Wrapf(err, "Failed to parse heading. %v", reassemble(fields))
+		}
+		return PilotData{
+			Base: Base{
+				Destination:  fields[1],
+				Source:       fields[2],
+				PacketNumber: packetNumber,
+				HopCount:     hopCount,
+			},
+			IdentFlag:   fields[5],
+			Callsign:    fields[6],
+			Transponder: transponder,
+			Rating:      rating,
+			Latitude:    latitude,
+			Longitude:   longitude,
+			Altitude:    altitude,
+			GroundSpeed: speed,
+			Heading:     heading,
+		}, nil
 	}
-	return errors.Errorf("Invalid pilot data packet. +%v", reassemble(split))
+	return PilotData{}, errors.Errorf("Invalid packet. %v", reassemble(fields))
 }
 
 // getHeading parses the PBH FSD value to extract the heading
-func getHeading(split string) (int, error) {
-	pbh, err := strconv.ParseUint(split, 10, 32)
+func getHeading(fields string) (int, error) {
+	pbh, err := strconv.ParseUint(fields, 10, 32)
 	if err != nil {
-		return 0, errors.Wrapf(err, "Failed to parse PBH field %+v", split)
+		return 0, errors.Wrapf(err, "Failed to parse PBH field %+v", fields)
 	}
 	hdgBit := (pbh >> 2) & 0x3FF
 	heading := float64(hdgBit) / 1024.0 * 360

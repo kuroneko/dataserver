@@ -5,6 +5,8 @@ fsd:
 data:
   server:
     name: name
+    email: email
+    location: location
   file:
     directory: directory
 sentry:

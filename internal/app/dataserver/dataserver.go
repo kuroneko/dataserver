@@ -43,15 +43,37 @@ func Start() {
 			sentry.CaptureException(err)
 		}
 	}()
-	fsd.Sync(conn)
+
+	// Set ourselves up as an FSD server
+	go setupServer(conn)
+
+	// Add a fake client to request data with
+	go dataserver.AddFSDClient(conn)
 
 	// Instantiate empty client list and begin listening for updates
 	clientList := &dataserver.ClientList{}
 	go update()
 	go exposeMetrics()
+	go dataserver.RequestATIS(conn, clientList)
 	listen(clientList, conn, producer)
 }
 
+// setupServer handles the creation of an FSD server
+func setupServer(conn *textproto.Conn) {
+	// Initial setup
+	fsd.SendNotify(conn)
+	time.Sleep(time.Second)
+	fsd.Sync(conn)
+
+	// Do this every 2 minutes from now on
+	for range time.Tick(2 * time.Minute) {
+		fsd.SendNotify(conn)
+		time.Sleep(time.Second)
+		fsd.Sync(conn)
+	}
+}
+
+// exposeMetrics listens for Prometheus scrapes
 func exposeMetrics() {
 	http.Handle("/metrics", promhttp.Handler())
 	err := http.ListenAndServe(":2112", nil)
@@ -87,19 +109,31 @@ func listen(clientList *dataserver.ClientList, conn *textproto.Conn, producer *k
 }
 
 // processMessage classifies the FSD packet and performs the appropriate action
-func processMessage(split []string, clientList *dataserver.ClientList, conn *textproto.Conn, producer *kafka.Producer) {
-	if split[0] == "ADDCLIENT" {
-		checkError(dataserver.AddClient(split, clientList, producer))
-	} else if split[0] == "RMCLIENT" {
-		checkError(dataserver.RemoveClient(split, clientList, producer))
-	} else if split[0] == "PD" {
-		checkError(dataserver.UpdatePosition(split, clientList, producer))
-	} else if split[0] == "AD" {
-		checkError(dataserver.UpdateControllerData(split, clientList, producer))
-	} else if split[0] == "PLAN" {
-		checkError(dataserver.UpdateFlightPlan(split, clientList, producer))
-	} else if split[0] == "PING" && len(split) >= 6 {
-		fsd.Pong(conn, split)
+func processMessage(fields []string, clientList *dataserver.ClientList, conn *textproto.Conn, producer *kafka.Producer) {
+	switch fields[0] {
+	case "ADDCLIENT":
+		checkError(dataserver.HandleAddClient(fields, clientList, producer))
+		break
+	case "RMCLIENT":
+		checkError(dataserver.RemoveClient(fields, clientList, producer))
+		break
+	case "PD":
+		checkError(dataserver.HandlePilotData(fields, clientList, producer))
+		break
+	case "AD":
+		checkError(dataserver.HandleATCData(fields, clientList, producer))
+		break
+	case "PLAN":
+		checkError(dataserver.HandleFlightPlan(fields, clientList, producer))
+		break
+	case "PING":
+		checkError(dataserver.HandlePing(fields, conn))
+		break
+	case "MC":
+		if fields[5] == "25" {
+			checkError(dataserver.HandleATISData(fields, clientList, producer))
+		}
+		break
 	}
 	packetsProcessed.Inc()
 }

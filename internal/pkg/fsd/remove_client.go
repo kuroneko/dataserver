@@ -2,20 +2,35 @@ package fsd
 
 import (
 	"github.com/pkg/errors"
+	"strconv"
 )
 
-// RemoveClient is the packet sent to remove a client from the network
+// RemoveClient RMCLIENT
 type RemoveClient struct {
+	Base
 	Callsign string
-	Server   string
 }
 
-// Parse parses a RMCLIENT packet from FSD
-func (r *RemoveClient) Parse(split []string) error {
-	if len(split) >= 6 {
-		r.Server = split[2]
-		r.Callsign = split[5]
-		return nil
+// DeserializeRemoveClient maps an array of strings to a RemoveClient struct
+func DeserializeRemoveClient(fields []string) (RemoveClient, error) {
+	if len(fields) >= 6 {
+		packetNumber, err := strconv.Atoi(fields[3][1:])
+		if err != nil {
+			return RemoveClient{}, errors.Wrapf(err, "Failed to parse packet number. %v", reassemble(fields))
+		}
+		hopCount, err := strconv.Atoi(fields[4])
+		if err != nil {
+			return RemoveClient{}, errors.Wrapf(err, "Failed to parse hop count. %v", reassemble(fields))
+		}
+		return RemoveClient{
+			Base: Base{
+				Destination:  fields[1],
+				Source:       fields[2],
+				PacketNumber: packetNumber,
+				HopCount:     hopCount,
+			},
+			Callsign: fields[5],
+		}, nil
 	}
-	return errors.Errorf("Invalid remove client packet. +%v", reassemble(split))
+	return RemoveClient{}, errors.Errorf("Invalid remove client packet. %v", reassemble(fields))
 }
