@@ -26,6 +26,8 @@ func (c *Context) HandlePilotData(fields []string) error {
 	if err != nil {
 		return err
 	}
+	c.ClientList.Mutex.Lock()
+	defer c.ClientList.Mutex.Unlock()
 	for i, v := range c.ClientList.PilotData {
 		if v.Callsign == fields[6] {
 			*&c.ClientList.PilotData[i].Latitude = pilotData.Latitude

@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/evalphobia/logrus_sentry"
+	"github.com/getsentry/sentry-go"
 	"github.com/olebedev/config"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
@@ -55,6 +56,9 @@ func ConfigureSentry() {
 	if err != nil {
 		log.Fatal("Sentry DSN not defined.")
 	}
+	err = sentry.Init(sentry.ClientOptions{
+		Dsn: dsn,
+	})
 	hook, err := logrus_sentry.NewSentryHook(dsn, []log.Level{
 		log.PanicLevel,
 		log.FatalLevel,

@@ -28,7 +28,8 @@ func (c *Context) HandleATCData(fields []string) error {
 	if err != nil {
 		return err
 	}
-	time.Now()
+	c.ClientList.Mutex.Lock()
+	defer c.ClientList.Mutex.Unlock()
 	for i, v := range c.ClientList.ATCData {
 		if v.Callsign == atcData.Callsign {
 			*&c.ClientList.ATCData[i].Frequency = atcData.Frequency

@@ -12,6 +12,8 @@ func (c *Context) RemoveClient(fields []string) error {
 	if err != nil {
 		return err
 	}
+	c.ClientList.Mutex.Lock()
+	defer c.ClientList.Mutex.Unlock()
 	for i, v := range c.ClientList.PilotData {
 		if v.Callsign == removeClient.Callsign {
 			*&c.ClientList.PilotData = append(c.ClientList.PilotData[:i], c.ClientList.PilotData[i+1:]...)

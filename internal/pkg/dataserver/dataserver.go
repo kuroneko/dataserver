@@ -74,45 +74,7 @@ func EncodeJSON(clientList ClientList) ([]byte, error) {
 func (c *Context) RemoveTimedOutClients() {
 	time.Sleep(1 * time.Minute)
 	for range time.Tick(15 * time.Second) {
-		for i, v := range c.ClientList.ATCData {
-			if time.Now().UTC().Sub(v.LastUpdated) >= 45*time.Second { // ATC send updates every 15 seconds, so we'll give them 3 tries
-				*&c.ClientList.ATCData = append(c.ClientList.ATCData[:i], c.ClientList.ATCData[i+1:]...)
-				data := ATC{
-					Server:   "",
-					Callsign: v.Callsign,
-					Rating:   0,
-					Member: MemberData{
-						CID:  0,
-						Name: "",
-					},
-				}
-				kafkaPush(c.Producer, data, "remove_client")
-				totalConnections.With(prometheus.Labels{"server": v.Server}).Dec()
-				log.WithFields(log.Fields{
-					"callsign": v.Callsign,
-					"server":   v.Server,
-				}).Debug("Client timed out.")
-			}
-		}
-		for i, v := range c.ClientList.PilotData {
-			if time.Now().UTC().Sub(v.LastUpdated) >= 15*time.Second { // Pilots send updates every 5 seconds, so we'll give them 3 tries
-				*&c.ClientList.PilotData = append(c.ClientList.PilotData[:i], c.ClientList.PilotData[i+1:]...)
-				data := Pilot{
-					Server:   "",
-					Callsign: v.Callsign,
-					Member: MemberData{
-						CID:  0,
-						Name: "",
-					},
-				}
-				kafkaPush(c.Producer, data, "remove_client")
-				totalConnections.With(prometheus.Labels{"server": v.Server}).Dec()
-				log.WithFields(log.Fields{
-					"callsign": v.Callsign,
-					"server":   v.Server,
-				}).Debug("Client timed out.")
-			}
-		}
+		c.checkForTimeouts()
 	}
 }
 
@@ -133,7 +95,7 @@ func (c *Context) RequestATIS() {
 	}
 }
 
-// setupServer handles the creation of an FSD server
+// SetupServer handles the creation of an FSD server
 func (c *Context) SetupServer() {
 	// Initial setup
 	c.SendNotify()
@@ -161,6 +123,53 @@ func WriteDataFile(clientJSON []byte) error {
 	return nil
 }
 
+// checkForTimeouts loops through all clients and checks if they have timed out
+func (c *Context) checkForTimeouts() {
+	c.ClientList.Mutex.Lock()
+	defer c.ClientList.Mutex.Unlock()
+	for i := 0; i < len(c.ClientList.ATCData); i++ {
+		if time.Now().UTC().Sub(*&c.ClientList.ATCData[i].LastUpdated) >= 45*time.Second { // ATC send updates every 15 seconds, so we'll give them 3 tries
+			data := ATC{
+				Server:   "",
+				Callsign: *&c.ClientList.ATCData[i].Callsign,
+				Rating:   0,
+				Member: MemberData{
+					CID:  0,
+					Name: "",
+				},
+			}
+			kafkaPush(c.Producer, data, "remove_client")
+			totalConnections.With(prometheus.Labels{"server": *&c.ClientList.ATCData[i].Server}).Dec()
+			log.WithFields(log.Fields{
+				"callsign": *&c.ClientList.ATCData[i].Callsign,
+				"server":   *&c.ClientList.ATCData[i].Server,
+			}).Debug("Client timed out.")
+			*&c.ClientList.ATCData = append(c.ClientList.ATCData[:i], c.ClientList.ATCData[i+1:]...)
+			i--
+		}
+	}
+	for i := 0; i < len(c.ClientList.PilotData); i++ {
+		if time.Now().UTC().Sub(*&c.ClientList.PilotData[i].LastUpdated) >= 15*time.Second { // Pilots send updates every 5 seconds, so we'll give them 3 tries
+			data := Pilot{
+				Server:   "",
+				Callsign: *&c.ClientList.PilotData[i].Callsign,
+				Member: MemberData{
+					CID:  0,
+					Name: "",
+				},
+			}
+			kafkaPush(c.Producer, data, "remove_client")
+			totalConnections.With(prometheus.Labels{"server": *&c.ClientList.PilotData[i].Server}).Dec()
+			log.WithFields(log.Fields{
+				"callsign": *&c.ClientList.PilotData[i].Callsign,
+				"server":   *&c.ClientList.PilotData[i].Server,
+			}).Debug("Client timed out.")
+			*&c.ClientList.PilotData = append(c.ClientList.PilotData[:i], c.ClientList.PilotData[i+1:]...)
+			i--
+		}
+	}
+}
+
 // kafkaPush publishes to the Kafka feed
 func kafkaPush(producer *kafka.Producer, data interface{}, messageType string) {
 	topic := "datafeed"
@@ -182,7 +191,7 @@ func kafkaPush(producer *kafka.Producer, data interface{}, messageType string) {
 	}
 }
 
-// listen continually reads, parses and handles FSD packets.
+// Listen continually reads, parses and handles FSD packets.
 func (c *Context) Listen() {
 	for {
 		bytes, err := fsd.ReadMessage(c.Consumer)

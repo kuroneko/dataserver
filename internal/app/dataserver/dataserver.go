@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -31,9 +32,11 @@ func Start() {
 
 	// Create our application context
 	context := dataserver.Context{
-		Consumer:   conn,
-		Producer:   producer,
-		ClientList: &dataserver.ClientList{},
+		Consumer: conn,
+		Producer: producer,
+		ClientList: &dataserver.ClientList{
+			Mutex: &sync.RWMutex{},
+		},
 	}
 
 	// Set ourselves up as an FSD server

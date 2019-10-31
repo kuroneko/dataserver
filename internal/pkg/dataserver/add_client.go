@@ -4,12 +4,14 @@ import (
 	"dataserver/internal/pkg/fsd"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"sync"
 )
 
 // ClientList is a list of all clients currently connected to the network.
 type ClientList struct {
-	PilotData []Pilot `json:"pilots"`
-	ATCData   []ATC   `json:"controllers"`
+	PilotData []Pilot       `json:"pilots"`
+	ATCData   []ATC         `json:"controllers"`
+	Mutex     *sync.RWMutex `json:"-"`
 }
 
 // MemberData represents a user's personal data.
@@ -24,6 +26,8 @@ func (c *Context) HandleAddClient(fields []string) error {
 	if err != nil {
 		return err
 	}
+	c.ClientList.Mutex.Lock()
+	defer c.ClientList.Mutex.Unlock()
 	if addClient.Type == 1 {
 		data := Pilot{
 			Server:   addClient.Server,

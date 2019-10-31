@@ -11,6 +11,8 @@ func (c *Context) HandleATISData(fields []string) error {
 	if err != nil {
 		return err
 	}
+	c.ClientList.Mutex.Lock()
+	defer c.ClientList.Mutex.Unlock()
 	for i, v := range c.ClientList.ATCData {
 		if v.Callsign == atis.From {
 			switch atis.Type {
