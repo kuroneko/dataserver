@@ -3,12 +3,11 @@ package dataserver
 import (
 	"dataserver/internal/pkg/fsd"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
-	"net/textproto"
+	"time"
 )
 
-// ATCData is data about individual controllers on the network.
-type ATCData struct {
+// ATC is data about individual controllers on the network.
+type ATC struct {
 	Server       string     `json:"server"`
 	Callsign     string     `json:"callsign"`
 	Member       MemberData `json:"member"`
@@ -20,22 +19,25 @@ type ATCData struct {
 	Longitude    float64    `json:"longitude"`
 	ATIS         string     `json:"atis"`
 	ATISReceived bool       `json:"-"`
+	LastUpdated  time.Time  `json:"last_updated"`
 }
 
 // HandleATCData updates a controllers's data in the Client list and updates the JSON file.
-func HandleATCData(fields []string, clientList *ClientList, producer *kafka.Producer) error {
+func (c *Context) HandleATCData(fields []string) error {
 	atcData, err := fsd.DeserializeATCData(fields)
 	if err != nil {
 		return err
 	}
-	for i, v := range clientList.ATCData {
+	time.Now()
+	for i, v := range c.ClientList.ATCData {
 		if v.Callsign == atcData.Callsign {
-			*&clientList.ATCData[i].Frequency = atcData.Frequency
-			*&clientList.ATCData[i].FacilityType = atcData.FacilityType
-			*&clientList.ATCData[i].VisualRange = atcData.VisualRange
-			*&clientList.ATCData[i].Latitude = atcData.Latitude
-			*&clientList.ATCData[i].Longitude = atcData.Longitude
-			kafkaPush(producer, clientList.ATCData[i], "update_controller_data")
+			*&c.ClientList.ATCData[i].Frequency = atcData.Frequency
+			*&c.ClientList.ATCData[i].FacilityType = atcData.FacilityType
+			*&c.ClientList.ATCData[i].VisualRange = atcData.VisualRange
+			*&c.ClientList.ATCData[i].Latitude = atcData.Latitude
+			*&c.ClientList.ATCData[i].Longitude = atcData.Longitude
+			*&c.ClientList.ATCData[i].LastUpdated = time.Now().UTC()
+			kafkaPush(c.Producer, c.ClientList.ATCData[i], "update_controller_data")
 			break
 		}
 	}
@@ -43,13 +45,13 @@ func HandleATCData(fields []string, clientList *ClientList, producer *kafka.Prod
 		"callsign":  atcData.Callsign,
 		"latitude":  atcData.Latitude,
 		"longitude": atcData.Longitude,
-	}).Info("ATC data packet received.")
-	Channel <- *clientList
+	}).Debug("ATC data packet received.")
+	Channel <- *c.ClientList
 	return nil
 }
 
 // sendATCData sends fake ATC data for our client
-func sendATCData(name string, err error, conn *textproto.Conn) {
+func (c *Context) sendATCData(name string) {
 	atcData := fsd.ATCData{
 		Base: fsd.Base{
 			Destination:  "*",
@@ -65,12 +67,12 @@ func sendATCData(name string, err error, conn *textproto.Conn) {
 		Latitude:     0.00000,
 		Longitude:    0.00000,
 	}
-	err = fsd.Send(conn, atcData.Serialize())
+	err := fsd.Send(c.Consumer, atcData.Serialize())
 	if err != nil {
 		log.WithFields(log.Fields{
-			"connection": conn,
+			"connection": c.Consumer,
 			"error":      err,
-		}).Panic("Failed to send AD packet to FSD server.")
+		}).Fatal("Failed to send AD packet to FSD server.")
 	}
-	log.WithField("packet", atcData.Serialize()).Info("Successfully sent AD packet to server.")
+	log.WithField("packet", atcData.Serialize()).Debug("Successfully sent AD packet to server.")
 }

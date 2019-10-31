@@ -3,7 +3,6 @@ package dataserver
 import (
 	"dataserver/internal/pkg/fsd"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 // FlightPlan describes the data about a filed flight plan.
@@ -30,14 +29,14 @@ type FlightPlanTime struct {
 }
 
 // HandleFlightPlan updates the flight plan entry for the specified callsign
-func HandleFlightPlan(fields []string, clientList *ClientList, producer *kafka.Producer) error {
+func (c *Context) HandleFlightPlan(fields []string) error {
 	flightPlan, err := fsd.DeserializeFlightPlan(fields)
 	if err != nil {
 		return err
 	}
-	for i, v := range clientList.PilotData {
+	for i, v := range c.ClientList.PilotData {
 		if v.Callsign == flightPlan.Callsign {
-			*&clientList.PilotData[i].FlightPlan = FlightPlan{
+			*&c.ClientList.PilotData[i].FlightPlan = FlightPlan{
 				FlightRules: flightPlan.Type,
 				Aircraft:    flightPlan.Aircraft,
 				CruiseSpeed: flightPlan.CruiseSpeed,
@@ -55,7 +54,7 @@ func HandleFlightPlan(fields []string, clientList *ClientList, producer *kafka.P
 					MinutesFuel:    flightPlan.MinutesFuel,
 				},
 			}
-			kafkaPush(producer, clientList.PilotData[i].FlightPlan, "update_flight_plan")
+			kafkaPush(c.Producer, c.ClientList.PilotData[i].FlightPlan, "update_flight_plan")
 			break
 		}
 	}
@@ -65,7 +64,7 @@ func HandleFlightPlan(fields []string, clientList *ClientList, producer *kafka.P
 		"departure": flightPlan.DepartureAirport,
 		"arrival":   flightPlan.DestinationAirport,
 		"altitude":  flightPlan.Altitude,
-	}).Info("Flight plan packet received.")
-	Channel <- *clientList
+	}).Debug("Flight plan packet received.")
+	Channel <- *c.ClientList
 	return nil
 }

@@ -3,36 +3,38 @@ package dataserver
 import (
 	"dataserver/internal/pkg/fsd"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
+	"time"
 )
 
-// PilotData is data about individual pilots on the network.
-type PilotData struct {
-	Server     string     `json:"server"`
-	Callsign   string     `json:"callsign"`
-	Member     MemberData `json:"member"`
-	Latitude   float64    `json:"latitude"`
-	Longitude  float64    `json:"longitude"`
-	Altitude   int        `json:"altitude"`
-	Speed      int        `json:"speed"`
-	Heading    int        `json:"heading"`
-	FlightPlan FlightPlan `json:"plan"`
+// Pilot is data about individual pilots on the network.
+type Pilot struct {
+	Server      string     `json:"server"`
+	Callsign    string     `json:"callsign"`
+	Member      MemberData `json:"member"`
+	Latitude    float64    `json:"latitude"`
+	Longitude   float64    `json:"longitude"`
+	Altitude    int        `json:"altitude"`
+	Speed       int        `json:"speed"`
+	Heading     int        `json:"heading"`
+	FlightPlan  FlightPlan `json:"plan"`
+	LastUpdated time.Time  `json:"last_updated"`
 }
 
 // HandlePilotData updates a client's position data in the Client list and updates the JSON file.
-func HandlePilotData(fields []string, clientList *ClientList, producer *kafka.Producer) error {
+func (c *Context) HandlePilotData(fields []string) error {
 	pilotData, err := fsd.DeserializePilotData(fields)
 	if err != nil {
 		return err
 	}
-	for i, v := range clientList.PilotData {
+	for i, v := range c.ClientList.PilotData {
 		if v.Callsign == fields[6] {
-			*&clientList.PilotData[i].Latitude = pilotData.Latitude
-			*&clientList.PilotData[i].Longitude = pilotData.Longitude
-			*&clientList.PilotData[i].Altitude = pilotData.Altitude
-			*&clientList.PilotData[i].Speed = pilotData.GroundSpeed
-			*&clientList.PilotData[i].Heading = pilotData.Heading
-			kafkaPush(producer, clientList.PilotData[i], "update_position")
+			*&c.ClientList.PilotData[i].Latitude = pilotData.Latitude
+			*&c.ClientList.PilotData[i].Longitude = pilotData.Longitude
+			*&c.ClientList.PilotData[i].Altitude = pilotData.Altitude
+			*&c.ClientList.PilotData[i].Speed = pilotData.GroundSpeed
+			*&c.ClientList.PilotData[i].Heading = pilotData.Heading
+			*&c.ClientList.PilotData[i].LastUpdated = time.Now().UTC()
+			kafkaPush(c.Producer, c.ClientList.PilotData[i], "update_position")
 			break
 		}
 	}
@@ -43,7 +45,7 @@ func HandlePilotData(fields []string, clientList *ClientList, producer *kafka.Pr
 		"altitude":  pilotData.Altitude,
 		"speed":     pilotData.GroundSpeed,
 		"heading":   pilotData.Heading,
-	}).Info("Pilot data packet received.")
-	Channel <- *clientList
+	}).Debug("Pilot data packet received.")
+	Channel <- *c.ClientList
 	return nil
 }

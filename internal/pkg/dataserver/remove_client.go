@@ -4,19 +4,18 @@ import (
 	"dataserver/internal/pkg/fsd"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
 
 // RemoveClient removes a client from the Client list and updates the JSON file.
-func RemoveClient(fields []string, clientList *ClientList, producer *kafka.Producer) error {
+func (c *Context) RemoveClient(fields []string) error {
 	removeClient, err := fsd.DeserializeRemoveClient(fields)
 	if err != nil {
 		return err
 	}
-	for i, v := range clientList.PilotData {
+	for i, v := range c.ClientList.PilotData {
 		if v.Callsign == removeClient.Callsign {
-			*&clientList.PilotData = append(clientList.PilotData[:i], clientList.PilotData[i+1:]...)
-			data := PilotData{
+			*&c.ClientList.PilotData = append(c.ClientList.PilotData[:i], c.ClientList.PilotData[i+1:]...)
+			data := Pilot{
 				Server:   "",
 				Callsign: removeClient.Callsign,
 				Member: MemberData{
@@ -25,14 +24,14 @@ func RemoveClient(fields []string, clientList *ClientList, producer *kafka.Produ
 				},
 			}
 
-			kafkaPush(producer, data, "remove_client")
+			kafkaPush(c.Producer, data, "remove_client")
 			break
 		}
 	}
-	for i, v := range clientList.ATCData {
+	for i, v := range c.ClientList.ATCData {
 		if v.Callsign == removeClient.Callsign {
-			*&clientList.ATCData = append(clientList.ATCData[:i], clientList.ATCData[i+1:]...)
-			data := ATCData{
+			*&c.ClientList.ATCData = append(c.ClientList.ATCData[:i], c.ClientList.ATCData[i+1:]...)
+			data := ATC{
 				Server:   "",
 				Callsign: removeClient.Callsign,
 				Rating:   0,
@@ -41,7 +40,7 @@ func RemoveClient(fields []string, clientList *ClientList, producer *kafka.Produ
 					Name: "",
 				},
 			}
-			kafkaPush(producer, data, "remove_client")
+			kafkaPush(c.Producer, data, "remove_client")
 			break
 		}
 	}
@@ -49,7 +48,7 @@ func RemoveClient(fields []string, clientList *ClientList, producer *kafka.Produ
 	log.WithFields(log.Fields{
 		"callsign": removeClient.Callsign,
 		"server":   removeClient.Source,
-	}).Info("Remove client packet received.")
-	Channel <- *clientList
+	}).Debug("Remove client packet received.")
+	Channel <- *c.ClientList
 	return nil
 }

@@ -4,14 +4,12 @@ import (
 	"dataserver/internal/pkg/fsd"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
-	"net/textproto"
 )
 
 // ClientList is a list of all clients currently connected to the network.
 type ClientList struct {
-	PilotData []PilotData `json:"pilots"`
-	ATCData   []ATCData   `json:"controllers"`
+	PilotData []Pilot `json:"pilots"`
+	ATCData   []ATC   `json:"controllers"`
 }
 
 // MemberData represents a user's personal data.
@@ -21,13 +19,13 @@ type MemberData struct {
 }
 
 // HandleAddClient adds a client to the Client list and updates the JSON file.
-func HandleAddClient(fields []string, clientList *ClientList, producer *kafka.Producer) error {
+func (c *Context) HandleAddClient(fields []string) error {
 	addClient, err := fsd.DeserializeAddClient(fields)
 	if err != nil {
 		return err
 	}
 	if addClient.Type == 1 {
-		data := PilotData{
+		data := Pilot{
 			Server:   addClient.Server,
 			Callsign: addClient.Callsign,
 			Member: MemberData{
@@ -35,10 +33,10 @@ func HandleAddClient(fields []string, clientList *ClientList, producer *kafka.Pr
 				Name: addClient.RealName,
 			},
 		}
-		*&clientList.PilotData = append(clientList.PilotData, data)
-		kafkaPush(producer, data, "add_client")
+		*&c.ClientList.PilotData = append(c.ClientList.PilotData, data)
+		kafkaPush(c.Producer, data, "add_client")
 	} else if addClient.Type == 2 {
-		data := ATCData{
+		data := ATC{
 			Server:   addClient.Server,
 			Callsign: addClient.Callsign,
 			Rating:   addClient.Rating,
@@ -47,21 +45,21 @@ func HandleAddClient(fields []string, clientList *ClientList, producer *kafka.Pr
 				Name: addClient.RealName,
 			},
 		}
-		*&clientList.ATCData = append(clientList.ATCData, data)
-		kafkaPush(producer, data, "add_client")
+		*&c.ClientList.ATCData = append(c.ClientList.ATCData, data)
+		kafkaPush(c.Producer, data, "add_client")
 	}
 	totalConnections.With(prometheus.Labels{"server": addClient.Server}).Inc()
 	log.WithFields(log.Fields{
 		"callsign": addClient.Callsign,
 		"name":     addClient.RealName,
 		"server":   addClient.Source,
-	}).Info("Add client packet received.")
-	Channel <- *clientList
+	}).Debug("Add client packet received.")
+	Channel <- *c.ClientList
 	return nil
 }
 
 // sendAddClient sends the packet to connect our fake client
-func sendAddClient(name string, err error, conn *textproto.Conn) {
+func (c *Context) sendAddClient(name string) {
 	addClient := fsd.AddClient{
 		Base: fsd.Base{
 			Destination:  "*",
@@ -79,12 +77,12 @@ func sendAddClient(name string, err error, conn *textproto.Conn) {
 		SimType:          -1,
 		Hidden:           1,
 	}
-	err = fsd.Send(conn, addClient.Serialize())
+	err := fsd.Send(c.Consumer, addClient.Serialize())
 	if err != nil {
 		log.WithFields(log.Fields{
-			"connection": conn,
+			"connection": c.Consumer,
 			"error":      err,
-		}).Panic("Failed to send ADDCLIENT packet to FSD server.")
+		}).Fatal("Failed to send ADDCLIENT packet to FSD server.")
 	}
-	log.WithField("packet", addClient.Serialize()).Info("Successfully sent ADDCLIENT packet to server.")
+	log.WithField("packet", addClient.Serialize()).Debug("Successfully sent ADDCLIENT packet to server.")
 }
