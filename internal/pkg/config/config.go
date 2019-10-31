@@ -59,6 +59,9 @@ func ConfigureSentry() {
 	err = sentry.Init(sentry.ClientOptions{
 		Dsn: dsn,
 	})
+	if err != nil {
+		log.Fatal("Failed to initialize Sentry.")
+	}
 	hook, err := logrus_sentry.NewSentryHook(dsn, []log.Level{
 		log.PanicLevel,
 		log.FatalLevel,

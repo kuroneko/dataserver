@@ -212,48 +212,40 @@ func (c *Context) processMessage(fields []string) {
 	switch fields[0] {
 	case "ADDCLIENT":
 		err := c.HandleAddClient(fields)
-		if err != nil {
-			log.WithField("error", err).Error("Failed to handle ADDCLIENT packet.")
-		}
+		checkPacketHandlerError(err, "ADDCLIENT")
 		break
 	case "RMCLIENT":
 		err := c.RemoveClient(fields)
-		if err != nil {
-			log.WithField("error", err).Error("Failed to handle RMCLIENT packet.")
-		}
+		checkPacketHandlerError(err, "RMCLIENT")
 		break
 	case "PD":
 		err := c.HandlePilotData(fields)
-		if err != nil {
-			log.WithField("error", err).Error("Failed to handle PD packet.")
-		}
+		checkPacketHandlerError(err, "PD")
 		break
 	case "AD":
 		err := c.HandleATCData(fields)
-		if err != nil {
-			log.WithField("error", err).Error("Failed to handle AD packet.")
-		}
+		checkPacketHandlerError(err, "AD")
 		break
 	case "PLAN":
 		err := c.HandleFlightPlan(fields)
-		if err != nil {
-			log.WithField("error", err).Error("Failed to handle PLAN packet.")
-		}
+		checkPacketHandlerError(err, "PLAN")
 		break
 	case "PING":
 		err := c.HandlePing(fields)
-		if err != nil {
-			log.WithField("error", err).Error("Failed to handle PING packet.")
-		}
+		checkPacketHandlerError(err, "PING")
 		break
 	case "MC":
 		if fields[5] == "25" {
 			err := c.HandleATISData(fields)
-			if err != nil {
-				log.WithField("error", err).Error("Failed to handle MC packet.")
-			}
+			checkPacketHandlerError(err, "MC")
 		}
 		break
 	}
 	packetsProcessed.Inc()
+}
+
+func checkPacketHandlerError(err error, packet string) {
+	if err != nil {
+		log.WithField("error", err).Errorf("Failed to handle %s packet.", packet)
+	}
 }

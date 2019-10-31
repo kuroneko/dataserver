@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// pdCount is a count of the number of packets we have sent to the FSD server.
+// PdCount is a count of the number of packets we have sent to the FSD server.
 var PdCount int
 
 // Connect establishes a connection to the FSD server.
@@ -32,7 +32,7 @@ func Connect() *textproto.Conn {
 	return conn
 }
 
-// send formats and sends a new FSD packet to the FSD server.
+// Send formats and sends a new FSD packet to the FSD server.
 func Send(conn *textproto.Conn, message string) error {
 	_, err := conn.Cmd(message)
 	if err != nil {
