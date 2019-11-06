@@ -29,7 +29,7 @@ func (c *Context) HandlePilotData(fields []string) error {
 	c.ClientList.Mutex.Lock()
 	defer c.ClientList.Mutex.Unlock()
 	for i, v := range c.ClientList.PilotData {
-		if v.Callsign == fields[6] {
+		if v.Callsign == pilotData.Callsign {
 			*&c.ClientList.PilotData[i].Latitude = pilotData.Latitude
 			*&c.ClientList.PilotData[i].Longitude = pilotData.Longitude
 			*&c.ClientList.PilotData[i].Altitude = pilotData.Altitude

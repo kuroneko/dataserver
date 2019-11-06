@@ -73,7 +73,7 @@ func EncodeJSON(clientList ClientList) ([]byte, error) {
 // RemoveTimedOutClients loops through the client lists to find clients who are no longer sending updates, and removes them.
 func (c *Context) RemoveTimedOutClients() {
 	time.Sleep(1 * time.Minute)
-	for range time.Tick(15 * time.Second) {
+	for range time.Tick(10 * time.Second) {
 		c.checkForTimeouts()
 	}
 }
@@ -128,17 +128,8 @@ func (c *Context) checkForTimeouts() {
 	c.ClientList.Mutex.Lock()
 	defer c.ClientList.Mutex.Unlock()
 	for i := 0; i < len(c.ClientList.ATCData); i++ {
-		if time.Now().UTC().Sub(*&c.ClientList.ATCData[i].LastUpdated) >= 45*time.Second { // ATC send updates every 15 seconds, so we'll give them 3 tries
-			data := ATC{
-				Server:   "",
-				Callsign: *&c.ClientList.ATCData[i].Callsign,
-				Rating:   0,
-				Member: MemberData{
-					CID:  0,
-					Name: "",
-				},
-			}
-			kafkaPush(c.Producer, data, "remove_client")
+		if time.Since(*&c.ClientList.ATCData[i].LastUpdated) >= (30 * time.Second) {
+			kafkaPush(c.Producer, *&c.ClientList.ATCData[i], "remove_client")
 			totalConnections.With(prometheus.Labels{"server": *&c.ClientList.ATCData[i].Server}).Dec()
 			log.WithFields(log.Fields{
 				"callsign": *&c.ClientList.ATCData[i].Callsign,
@@ -149,16 +140,8 @@ func (c *Context) checkForTimeouts() {
 		}
 	}
 	for i := 0; i < len(c.ClientList.PilotData); i++ {
-		if time.Now().UTC().Sub(*&c.ClientList.PilotData[i].LastUpdated) >= 15*time.Second { // Pilots send updates every 5 seconds, so we'll give them 3 tries
-			data := Pilot{
-				Server:   "",
-				Callsign: *&c.ClientList.PilotData[i].Callsign,
-				Member: MemberData{
-					CID:  0,
-					Name: "",
-				},
-			}
-			kafkaPush(c.Producer, data, "remove_client")
+		if time.Since(*&c.ClientList.PilotData[i].LastUpdated) >= (30 * time.Second) {
+			kafkaPush(c.Producer, *&c.ClientList.PilotData[i], "remove_client")
 			totalConnections.With(prometheus.Labels{"server": *&c.ClientList.PilotData[i].Server}).Dec()
 			log.WithFields(log.Fields{
 				"callsign": *&c.ClientList.PilotData[i].Callsign,
