@@ -17,6 +17,7 @@ import (
 // Start connects and begins parsing and saving data files.
 func Start() {
 	// Configuration
+	log.SetLevel(log.DebugLevel)
 	config.ReadConfig()
 	config.ConfigureSentry()
 	producer := config.ConfigureKafka()
