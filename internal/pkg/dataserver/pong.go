@@ -28,5 +28,5 @@ func (c *Context) sendPong(ping fsd.Ping) {
 			"error":      err,
 		}).Fatal("Failed to send PONG packet to FSD server.")
 	}
-	log.WithField("packet", pong.Serialize()).Debug("Successfully sent PONG packet to server.")
+	log.WithField("packet", pong.Serialize()).Info("Successfully sent PONG packet to server.")
 }

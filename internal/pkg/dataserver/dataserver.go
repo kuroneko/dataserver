@@ -134,7 +134,7 @@ func (c *Context) checkForTimeouts() {
 			log.WithFields(log.Fields{
 				"callsign": *&c.ClientList.ATCData[i].Callsign,
 				"server":   *&c.ClientList.ATCData[i].Server,
-			}).Debug("Client timed out.")
+			}).Info("Client timed out.")
 			*&c.ClientList.ATCData = append(c.ClientList.ATCData[:i], c.ClientList.ATCData[i+1:]...)
 			i--
 		}
@@ -146,7 +146,7 @@ func (c *Context) checkForTimeouts() {
 			log.WithFields(log.Fields{
 				"callsign": *&c.ClientList.PilotData[i].Callsign,
 				"server":   *&c.ClientList.PilotData[i].Server,
-			}).Debug("Client timed out.")
+			}).Info("Client timed out.")
 			*&c.ClientList.PilotData = append(c.ClientList.PilotData[:i], c.ClientList.PilotData[i+1:]...)
 			i--
 		}

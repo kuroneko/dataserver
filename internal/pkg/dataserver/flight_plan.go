@@ -66,7 +66,7 @@ func (c *Context) HandleFlightPlan(fields []string) error {
 		"departure": flightPlan.DepartureAirport,
 		"arrival":   flightPlan.DestinationAirport,
 		"altitude":  flightPlan.Altitude,
-	}).Debug("Flight plan packet received.")
+	}).Info("Flight plan packet received.")
 	Channel <- *c.ClientList
 	return nil
 }

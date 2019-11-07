@@ -47,7 +47,7 @@ func (c *Context) HandlePilotData(fields []string) error {
 		"altitude":  pilotData.Altitude,
 		"speed":     pilotData.GroundSpeed,
 		"heading":   pilotData.Heading,
-	}).Debug("Pilot data packet received.")
+	}).Info("Pilot data packet received.")
 	Channel <- *c.ClientList
 	return nil
 }

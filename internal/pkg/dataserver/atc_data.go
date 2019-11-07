@@ -46,7 +46,7 @@ func (c *Context) HandleATCData(fields []string) error {
 		"callsign":  atcData.Callsign,
 		"latitude":  atcData.Latitude,
 		"longitude": atcData.Longitude,
-	}).Debug("ATC data packet received.")
+	}).Info("ATC data packet received.")
 	Channel <- *c.ClientList
 	return nil
 }
@@ -75,5 +75,5 @@ func (c *Context) sendATCData(name string) {
 			"error":      err,
 		}).Fatal("Failed to send AD packet to FSD server.")
 	}
-	log.WithField("packet", atcData.Serialize()).Debug("Successfully sent AD packet to server.")
+	log.WithField("packet", atcData.Serialize()).Info("Successfully sent AD packet to server.")
 }

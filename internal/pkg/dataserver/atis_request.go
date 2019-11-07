@@ -21,6 +21,6 @@ func (c *Context) sendATISRequest(name string) {
 		if err != nil {
 			log.WithField("packet", atisRequest.Serialize()).Error("Failed to request ATIS.")
 		}
-		log.WithField("packet", atisRequest.Serialize()).Debug("Successfully requested ATIS.")
+		log.WithField("packet", atisRequest.Serialize()).Info("Successfully requested ATIS.")
 	}
 }
