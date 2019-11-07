@@ -57,7 +57,7 @@ func (c *Context) HandleAddClient(fields []string) error {
 		"callsign": addClient.Callsign,
 		"name":     addClient.RealName,
 		"server":   addClient.Source,
-	}).Info("Add client packet received.")
+	}).Debug("Add client packet received.")
 	Channel <- *c.ClientList
 	return nil
 }
@@ -88,5 +88,5 @@ func (c *Context) sendAddClient(name string) {
 			"error":      err,
 		}).Fatal("Failed to send ADDCLIENT packet to FSD server.")
 	}
-	log.WithField("packet", addClient.Serialize()).Info("Successfully sent ADDCLIENT packet to server.")
+	log.WithField("packet", addClient.Serialize()).Debug("Successfully sent ADDCLIENT packet to server.")
 }

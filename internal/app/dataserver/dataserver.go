@@ -84,7 +84,7 @@ func s3Loop(k string) {
 	log.WithFields(log.Fields{
 		"object": objectName,
 		"size":   n,
-	}).Info("Successfully uploaded object to S3.")
+	}).Debug("Successfully uploaded object to S3.")
 }
 
 // s3Push sets up  the S3 library and begins the goroutine
@@ -122,7 +122,7 @@ func updateFile(clientList dataserver.ClientList) error {
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	log.Info("Data file updated.")
+	log.Debug("Data file updated.")
 	s3Push()
 
 	return nil

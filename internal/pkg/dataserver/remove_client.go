@@ -50,7 +50,7 @@ func (c *Context) RemoveClient(fields []string) error {
 	log.WithFields(log.Fields{
 		"callsign": removeClient.Callsign,
 		"server":   removeClient.Source,
-	}).Info("Remove client packet received.")
+	}).Debug("Remove client packet received.")
 	Channel <- *c.ClientList
 	return nil
 }

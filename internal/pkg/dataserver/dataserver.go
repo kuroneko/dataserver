@@ -39,6 +39,18 @@ var (
 		Name: "dataserver_time_to_process_packet",
 		Help: "The time to process a packet sent by FSD.",
 	})
+
+	timeBetweenPilotUpdates = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name: "dataserver_time_between_pilot_updates",
+		Help: "The time between pilot position updates.",
+		Buckets: []float64{5.0, 20.0},
+	})
+
+	timeBetweenATCUpdates = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name: "dataserver_time_between_atc_updates",
+		Help: "The time between ATC position updates.",
+		Buckets: []float64{15.0, 60.0},
+	})
 )
 
 // AddFSDClient handles the creation of an FSD client to request data with
@@ -133,7 +145,7 @@ func (c *Context) checkForTimeouts() {
 			log.WithFields(log.Fields{
 				"callsign": *&c.ClientList.ATCData[i].Callsign,
 				"server":   *&c.ClientList.ATCData[i].Server,
-			}).Info("Client timed out.")
+			}).Debug("Client timed out.")
 			*&c.ClientList.ATCData = append(c.ClientList.ATCData[:i], c.ClientList.ATCData[i+1:]...)
 			i--
 		}
@@ -145,7 +157,7 @@ func (c *Context) checkForTimeouts() {
 			log.WithFields(log.Fields{
 				"callsign": *&c.ClientList.PilotData[i].Callsign,
 				"server":   *&c.ClientList.PilotData[i].Server,
-			}).Info("Client timed out.")
+			}).Debug("Client timed out.")
 			*&c.ClientList.PilotData = append(c.ClientList.PilotData[:i], c.ClientList.PilotData[i+1:]...)
 			i--
 		}

@@ -14,7 +14,7 @@ var Cfg *config.Config
 
 // ConfigureKafka sets the Kafka connection up
 func ConfigureKafka() *kafka.Producer {
-	log.Info("Starting Kafka connection.")
+	log.Debug("Starting Kafka connection.")
 	kafkaServer, err := Cfg.String("kafka.server")
 	if err != nil {
 		log.Fatal("Kafka server not defined.")
@@ -46,7 +46,7 @@ func ConfigureKafka() *kafka.Producer {
 	if err != nil {
 		log.Fatal("Failed to connect to Kafka.")
 	}
-	log.Info("Kafka successfully connected.")
+	log.Debug("Kafka successfully connected.")
 	return producer
 }
 

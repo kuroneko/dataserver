@@ -28,7 +28,7 @@ func (c *Context) HandleATISData(fields []string) error {
 	log.WithFields(log.Fields{
 		"callsign": atis.From,
 		"data":     atis.Data,
-	}).Info("ATIS data packet received.")
+	}).Debug("ATIS data packet received.")
 	Channel <- *c.ClientList
 	return nil
 }

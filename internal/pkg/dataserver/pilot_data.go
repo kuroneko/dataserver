@@ -30,6 +30,7 @@ func (c *Context) HandlePilotData(fields []string) error {
 	defer c.ClientList.Mutex.Unlock()
 	for i, v := range c.ClientList.PilotData {
 		if v.Callsign == pilotData.Callsign {
+			timeBetweenPilotUpdates.Observe(time.Since(*&c.ClientList.PilotData[i].LastUpdated).Seconds())
 			*&c.ClientList.PilotData[i].Latitude = pilotData.Latitude
 			*&c.ClientList.PilotData[i].Longitude = pilotData.Longitude
 			*&c.ClientList.PilotData[i].Altitude = pilotData.Altitude
@@ -47,7 +48,7 @@ func (c *Context) HandlePilotData(fields []string) error {
 		"altitude":  pilotData.Altitude,
 		"speed":     pilotData.GroundSpeed,
 		"heading":   pilotData.Heading,
-	}).Info("Pilot data packet received.")
+	}).Debug("Pilot data packet received.")
 	Channel <- *c.ClientList
 	return nil
 }

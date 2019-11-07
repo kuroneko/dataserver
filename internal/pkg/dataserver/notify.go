@@ -43,5 +43,5 @@ func (c *Context) SendNotify() {
 			"error":      err,
 		}).Fatal("Failed to send SYNC packet to FSD server.")
 	}
-	log.WithField("packet", notify.Serialize()).Info("Successfully sent NOTIFY packet.")
+	log.WithField("packet", notify.Serialize()).Debug("Successfully sent NOTIFY packet.")
 }
