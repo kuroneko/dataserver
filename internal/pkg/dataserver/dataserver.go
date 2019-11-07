@@ -43,13 +43,13 @@ var (
 	timeBetweenPilotUpdates = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name: "dataserver_time_between_pilot_updates",
 		Help: "The time between pilot position updates.",
-		Buckets: []float64{5.0, 20.0},
+		Buckets: []float64{5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 120.0, 180.0},
 	})
 
 	timeBetweenATCUpdates = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name: "dataserver_time_between_atc_updates",
 		Help: "The time between ATC position updates.",
-		Buckets: []float64{15.0, 60.0},
+		Buckets: []float64{15.0, 30.0, 45.0, 60.0, 120.0, 180.0},
 	})
 )
 
