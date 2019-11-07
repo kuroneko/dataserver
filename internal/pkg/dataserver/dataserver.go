@@ -72,8 +72,7 @@ func EncodeJSON(clientList ClientList) ([]byte, error) {
 
 // RemoveTimedOutClients loops through the client lists to find clients who are no longer sending updates, and removes them.
 func (c *Context) RemoveTimedOutClients() {
-	time.Sleep(1 * time.Minute)
-	for range time.Tick(10 * time.Second) {
+	for range time.Tick(5 * time.Minute) {
 		c.checkForTimeouts()
 	}
 }
@@ -128,7 +127,7 @@ func (c *Context) checkForTimeouts() {
 	c.ClientList.Mutex.Lock()
 	defer c.ClientList.Mutex.Unlock()
 	for i := 0; i < len(c.ClientList.ATCData); i++ {
-		if time.Since(*&c.ClientList.ATCData[i].LastUpdated) >= (30 * time.Second) {
+		if time.Since(*&c.ClientList.ATCData[i].LastUpdated) >= (5 * time.Minute) {
 			kafkaPush(c.Producer, *&c.ClientList.ATCData[i], "remove_client")
 			totalConnections.With(prometheus.Labels{"server": *&c.ClientList.ATCData[i].Server}).Dec()
 			log.WithFields(log.Fields{
@@ -140,7 +139,7 @@ func (c *Context) checkForTimeouts() {
 		}
 	}
 	for i := 0; i < len(c.ClientList.PilotData); i++ {
-		if time.Since(*&c.ClientList.PilotData[i].LastUpdated) >= (30 * time.Second) {
+		if time.Since(*&c.ClientList.PilotData[i].LastUpdated) >= (5 * time.Minute) {
 			kafkaPush(c.Producer, *&c.ClientList.PilotData[i], "remove_client")
 			totalConnections.With(prometheus.Labels{"server": *&c.ClientList.PilotData[i].Server}).Dec()
 			log.WithFields(log.Fields{
