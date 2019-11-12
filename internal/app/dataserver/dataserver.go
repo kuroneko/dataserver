@@ -100,14 +100,32 @@ func s3Push() {
 
 // update handles the creation of a 15 second ticker for updating the data file
 func update() {
-	now := time.Now().UTC()
-	for clientList := range dataserver.Channel {
-		if time.Since(now) >= (15 * time.Second) {
+	var nextWriteTimeout <-chan time.Time = nil
+	var clientList dataserver.ClientList
+	var ok bool // this needs be be defined outside of the select - using := redefines clientList scoped within the for.
+
+	for {
+		select {
+		case clientList, ok = <-dataserver.Channel:
+			if !ok {
+				break
+			}
+			if nextWriteTimeout == nil {
+				err := updateFile(clientList)
+				if err != nil {
+					log.WithField("error", err).Error("Failed to update data file.")
+				} else {
+					nextWriteTimeout = time.After(15 * time.Second)
+				}
+			}
+		case <-nextWriteTimeout:
+			nextWriteTimeout = nil
 			err := updateFile(clientList)
 			if err != nil {
 				log.WithField("error", err).Error("Failed to update data file.")
+				// retry in 5
+				nextWriteTimeout = time.After(5 * time.Second)
 			}
-			now = time.Now().UTC()
 		}
 	}
 }
