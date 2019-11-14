@@ -5,62 +5,65 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/olebedev/config"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 	"io/ioutil"
 )
 
 // Cfg contains all of the necessary configuration data.
-var Cfg *config.Config
+type Config struct {
+	FSD               *FsdConfig
+	S3Buckets         []*BucketConfig
+	Kafka             *KafkaConfig
+	DataFileDirectory string
+}
 
-// ConfigureKafka sets the Kafka connection up
-func ConfigureKafka() *kafka.Producer {
-	log.Debug("Starting Kafka connection.")
-	kafkaServer, err := Cfg.String("kafka.server")
+func New(configFile string) (c *Config, err error) {
+	c = &Config{}
+	file, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		log.Fatal("Kafka server not defined.")
+		return nil, err
 	}
-	kafkaUsername, err := Cfg.String("kafka.credentials.username")
+	yamlString := string(file)
+	configObj, err := config.ParseYaml(yamlString)
 	if err != nil {
-		log.Fatal("Kafka username not defined.")
+		return nil, err
 	}
-	kafkaPassword, err := Cfg.String("kafka.credentials.password")
+	// parse the items.
+
+	c.DataFileDirectory, err = configObj.String("data.file.directory")
 	if err != nil {
-		log.Fatal("Kafka password not defined.")
+		return nil, err
 	}
-	kafkaProtocol, err := Cfg.String("kafka.credentials.protocol")
+	err = configureSentry(configObj)
 	if err != nil {
-		log.Fatal("Kafka protocol not defined.")
+		return nil, err
 	}
-	kafkaMechanism, err := Cfg.String("kafka.credentials.mechanism")
+	c.FSD, err = newFsdConfig(configObj)
 	if err != nil {
-		log.Fatal("Kafka authentication mechanism not defined.")
+		return nil, err
 	}
-	producer, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers":   kafkaServer,
-		"sasl.username":       kafkaUsername,
-		"sasl.password":       kafkaPassword,
-		"security.protocol":   kafkaProtocol,
-		"sasl.mechanism":      kafkaMechanism,
-		"go.delivery.reports": false,
-	})
+	c.S3Buckets, err = allBucketConfigs(configObj)
 	if err != nil {
-		log.Fatal("Failed to connect to Kafka.")
+		return nil, err
 	}
-	log.Debug("Kafka successfully connected.")
-	return producer
+	c.Kafka, err = newKafkaConfigFromConfig(configObj)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 // ConfigureSentry sets up Sentry for panic reporting
-func ConfigureSentry() {
-	dsn, err := Cfg.String("sentry.credentials.dsn")
+func configureSentry(c *config.Config) (err error) {
+	dsn, err := c.String("sentry.credentials.dsn")
 	if err != nil {
-		log.Fatal("Sentry DSN not defined.")
+		// if the DSN isn't set, that's not a fatal error.  Just don't enable Sentry.
+		return nil
 	}
 	err = sentry.Init(sentry.ClientOptions{
 		Dsn: dsn,
 	})
 	if err != nil {
-		log.Fatal("Failed to initialize Sentry.")
+		return err
 	}
 	hook, err := logrus_sentry.NewSentryHook(dsn, []log.Level{
 		log.PanicLevel,
@@ -68,20 +71,8 @@ func ConfigureSentry() {
 		log.ErrorLevel,
 	})
 	if err != nil {
-		log.Fatal("Failed to setup Sentry log hook.")
+		return err
 	}
 	log.AddHook(hook)
-}
-
-// ReadConfig reads the config file and instantiates the config object
-func ReadConfig() {
-	file, err := ioutil.ReadFile("configs/config.yml")
-	if err != nil {
-		log.Fatal("Failed to open configuration file.")
-	}
-	yamlString := string(file)
-	Cfg, err = config.ParseYaml(yamlString)
-	if err != nil {
-		log.Fatal("Failed to parse configuration file.")
-	}
+	return nil
 }

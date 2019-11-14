@@ -12,24 +12,16 @@ import (
 var PdCount int
 
 // Connect establishes a connection to the FSD server.
-func Connect() *textproto.Conn {
-	ip, err := config.Cfg.String("fsd.server.ip")
-	if err != nil {
-		log.Fatal("FSD IP not defined.")
-	}
-	port, err := config.Cfg.String("fsd.server.port")
-	if err != nil {
-		log.Fatal("FSD port not defined.")
-	}
-	conn, err := textproto.Dial("tcp", ip+":"+port)
+func Connect(c *config.FsdConfig) (conn *textproto.Conn, err error) {
+	conn, err = textproto.Dial("tcp", c.String())
 	if err != nil {
 		log.WithFields(log.Fields{
-			"ip":    ip,
-			"port":  port,
+			"ip":    c.Hostname,
+			"port":  c.Port,
 			"error": err,
-		}).Fatal("Failed to connect to FSD server.")
+		}).Error("Failed to connect to FSD server.")
 	}
-	return conn
+	return
 }
 
 // Send formats and sends a new FSD packet to the FSD server.

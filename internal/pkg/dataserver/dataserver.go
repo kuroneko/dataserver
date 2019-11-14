@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/textproto"
+	"path"
 	"time"
 )
 
@@ -59,25 +60,97 @@ type Context struct {
 	Consumer   *textproto.Conn
 	Producer   *kafka.Producer
 	ClientList *ClientList
+
+	Config *config.Config
+}
+
+var (
+	ErrNoKafkaConfig = errors.New("Kafka Configuration Not Found")
+	ErrNoFSDConfig   = errors.New("FSD Configuration Not Found")
+)
+
+func (c *Context) configureKafka() (err error) {
+	if c.Producer != nil {
+		return
+	}
+	if c.Config.Kafka == nil {
+		return ErrNoKafkaConfig
+	}
+	log.Debug("Starting Kafka connection.")
+	c.Producer, err = kafka.NewProducer(&kafka.ConfigMap{
+		"bootstrap.servers":   c.Config.Kafka.ServerName,
+		"sasl.username":       c.Config.Kafka.SaslUsername,
+		"sasl.password":       c.Config.Kafka.SaslPassword,
+		"security.protocol":   c.Config.Kafka.SecurityProtocol,
+		"sasl.mechanism":      c.Config.Kafka.SaslMechanism,
+		"go.delivery.reports": false,
+	})
+	if err != nil {
+		log.Errorf("Failed to connect to Kafka: %v", err)
+		return err
+	}
+	log.Debug("Kafka successfully connected.")
+	return nil
+}
+
+func (c *Context) connectFSD() (err error) {
+	if c.Consumer != nil {
+		return nil
+	}
+	if c.Config.FSD == nil {
+		return ErrNoFSDConfig
+	}
+	c.Consumer, err = fsd.Connect(c.Config.FSD)
+	return
+}
+
+func New(config *config.Config) (ctx *Context, err error) {
+	ctx = &Context{
+		Consumer:   nil,
+		Producer:   nil,
+		ClientList: nil,
+		Config:     config,
+	}
+	err = ctx.configureKafka()
+	if err != nil {
+		return nil, err
+	}
+
+	// Connect to FSD
+	err = ctx.connectFSD()
+	if err != nil {
+		return nil, err
+	}
+	return ctx, nil
+}
+
+func (c *Context) Close() (err error) {
+	if c.Producer != nil {
+		c.Producer.Close()
+		c.Producer = nil
+	}
+	if c.Consumer != nil {
+		if err := c.Consumer.Close(); err != nil {
+			log.Errorf("Failed to close FSD connection: %v", err)
+		}
+		c.Consumer = nil
+	}
+	return nil
 }
 
 // AddFSDClient handles the creation of an FSD client to request data with
 func (c *Context) AddFSDClient() {
-	name, err := config.Cfg.String("data.server.name")
-	if err != nil {
-		log.Fatal("Data server name not defined.")
-	}
-
 	// Initial setup
-	c.sendAddClient(name)
+	c.sendAddClient(c.Config.FSD.DataServerName)
 	time.Sleep(time.Second)
-	c.sendATCData(name)
+	c.sendATCData(c.Config.FSD.DataServerName)
 
+	//FIXME: use time.Ticker
 	// Continually send updates every 30 seconds to keep the connection alive
 	for range time.Tick(30 * time.Second) {
-		c.sendAddClient(name)
+		c.sendAddClient(c.Config.FSD.DataServerName)
 		time.Sleep(time.Second)
-		c.sendATCData(name)
+		c.sendATCData(c.Config.FSD.DataServerName)
 	}
 }
 
@@ -99,18 +172,13 @@ func (c *Context) RemoveTimedOutClients() {
 
 // RequestATIS sends requests to all ATC clients for their ATIS every minute
 func (c *Context) RequestATIS() {
-	name, err := config.Cfg.String("data.server.name")
-	if err != nil {
-		log.Fatal("Data server name not defined.")
-	}
-
 	// Initial setup, give the server 5 seconds to process the backlog of added clients
 	time.Sleep(5 * time.Second)
-	c.sendATISRequest(name)
+	c.sendATISRequest(c.Config.FSD.DataServerName)
 
 	// Continue to request ATIS data every minute
 	for range time.Tick(time.Minute) {
-		c.sendATISRequest(name)
+		c.sendATISRequest(c.Config.FSD.DataServerName)
 	}
 }
 
@@ -130,12 +198,9 @@ func (c *Context) SetupServer() {
 }
 
 // WriteDataFile overwrites the data file with new data.
-func WriteDataFile(clientJSON []byte) error {
-	directory, err := config.Cfg.String("data.file.directory")
-	if err != nil {
-		log.Fatal("Data file directory not defined.")
-	}
-	err = ioutil.WriteFile(directory+"vatsim-data.json", clientJSON, 0644)
+func (c *Context) WriteDataFile(clientJSON []byte) (err error) {
+	filePath := path.Join(c.Config.DataFileDirectory, "vatsim-data.json")
+	err = ioutil.WriteFile(filePath, clientJSON, 0644)
 	if err != nil {
 		return errors.WithStack(err)
 	}
