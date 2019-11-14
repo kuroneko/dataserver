@@ -6,7 +6,7 @@ require (
 	github.com/certifi/gocertifi v0.0.0-20191021191039-0944d244cd40 // indirect
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/getsentry/raven-go v0.2.0 // indirect
-	github.com/getsentry/sentry-go v0.3.0
+	github.com/getsentry/sentry-go v0.3.1
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/minio/minio-go v0.0.0-20190523192347-c6c2912aa552
 	github.com/olebedev/config v0.0.0-20190528211619-364964f3a8e4
